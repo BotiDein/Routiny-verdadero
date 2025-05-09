@@ -5,7 +5,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
-
+  //Hola
 void main() async {
   // Aseguramos que Flutter esté inicializado
   WidgetsFlutterBinding.ensureInitialized();
