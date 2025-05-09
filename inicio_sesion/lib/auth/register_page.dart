@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../screens/main_screen.dart';
 import 'login_page.dart';
+import '../auth/landing_page.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -11,6 +12,7 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
+  final nameController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
@@ -19,6 +21,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   void dispose() {
+    nameController.dispose();
     emailController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
@@ -28,7 +31,6 @@ class _RegisterPageState extends State<RegisterPage> {
   Future<void> register() async {
     if (!mounted) return;
 
-    // Validar que las contraseñas coincidan
     if (passwordController.text != confirmPasswordController.text) {
       setState(() => error = 'Las contraseñas no coinciden');
       return;
@@ -65,8 +67,7 @@ class _RegisterPageState extends State<RegisterPage> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    
-    // Calcular tamaños relativos
+
     final buttonWidth = screenWidth * 0.7;
     final buttonHeight = screenHeight * 0.06;
     final fontSize = screenWidth * 0.04;
@@ -74,27 +75,74 @@ class _RegisterPageState extends State<RegisterPage> {
       horizontal: screenWidth * 0.04,
       vertical: screenHeight * 0.015,
     );
-    
+
     return Scaffold(
       backgroundColor: Colors.cyan[50],
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const LandingPage()),
+            );
+          },
+        ),
+      ),
       body: Center(
         child: Padding(
           padding: EdgeInsets.all(screenWidth * 0.06),
           child: SingleChildScrollView(
             child: Column(
               children: [
-                Icon(
-                  Icons.person_add,
-                  size: screenWidth * 0.3,
-                  color: Colors.blue,
+                // Logo y nombre de la app
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Image.asset(
+                      'assets/logo.png',
+                      width: screenWidth * 0.4,
+                      height: screenWidth * 0.4,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Icon(
+                          Icons.image_not_supported,
+                          size: screenWidth * 0.4,
+                          color: Colors.grey,
+                        );
+                      },
+                    ),
+                    SizedBox(width: screenWidth * 0.04),
+                    Text(
+                      'Routiny',
+                      style: TextStyle(
+                        fontFamily: 'RobotoBold',
+                        fontSize: screenWidth * 0.12,
+                        color: const Color(0xFF0052A9),
+                      ),
+                    ),
+                  ],
                 ),
-                SizedBox(height: screenHeight * 0.04),
+                SizedBox(height: screenHeight * 0.03), // Reducido para más espacio
+
+                // Campo para el nombre del usuario
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Nombre',
+                    style: TextStyle(
+                      fontSize: fontSize,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
                 TextField(
-                  controller: emailController,
+                  controller: nameController,
                   decoration: InputDecoration(
-                    labelText: 'Correo electrónico',
                     filled: true,
-                    fillColor: Colors.cyanAccent,
+                    fillColor: const Color.fromARGB(255, 202, 255, 251),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(screenWidth * 0.02),
                     ),
@@ -102,13 +150,50 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                 ),
                 SizedBox(height: screenHeight * 0.02),
+
+                // Campo para el correo electrónico
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Correo electrónico',
+                    style: TextStyle(
+                      fontSize: fontSize,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+                TextField(
+                  controller: emailController,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: const Color.fromARGB(255, 202, 255, 251),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(screenWidth * 0.02),
+                    ),
+                    contentPadding: inputPadding,
+                  ),
+                ),
+                SizedBox(height: screenHeight * 0.02),
+
+                // Campo para la contraseña
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Contraseña',
+                    style: TextStyle(
+                      fontSize: fontSize,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
                 TextField(
                   controller: passwordController,
                   obscureText: true,
                   decoration: InputDecoration(
-                    labelText: 'Contraseña',
                     filled: true,
-                    fillColor: Colors.cyanAccent,
+                    fillColor: const Color.fromARGB(255, 202, 255, 251),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(screenWidth * 0.02),
                     ),
@@ -116,20 +201,34 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                 ),
                 SizedBox(height: screenHeight * 0.02),
+
+                // Campo para confirmar la contraseña
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Confirmar contraseña',
+                    style: TextStyle(
+                      fontSize: fontSize,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
                 TextField(
                   controller: confirmPasswordController,
                   obscureText: true,
                   decoration: InputDecoration(
-                    labelText: 'Confirmar contraseña',
                     filled: true,
-                    fillColor: Colors.cyanAccent,
+                    fillColor: const Color.fromARGB(255, 202, 255, 251),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(screenWidth * 0.02),
                     ),
                     contentPadding: inputPadding,
                   ),
                 ),
-                SizedBox(height: screenHeight * 0.03),
+                SizedBox(height: screenHeight * 0.03), // Reducido para más espacio
+
+                // Botón de registro
                 SizedBox(
                   width: buttonWidth,
                   height: buttonHeight,
@@ -148,6 +247,8 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
                 ),
+
+                // Mostrar error si hay alguno
                 if (error.isNotEmpty)
                   Padding(
                     padding: EdgeInsets.only(top: screenHeight * 0.02),
@@ -159,6 +260,8 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                     ),
                   ),
+
+                // Enlace para ir al login
                 SizedBox(height: screenHeight * 0.03),
                 TextButton(
                   onPressed: () => Navigator.pushReplacement(

@@ -8,33 +8,32 @@ class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
 
   void _showGuestDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        title: const Text('Advertencia'),
-        content:
-            const Text('Si se borra la app, los datos no quedarán guardados.'),
-        actions: [
-          TextButton(
-            child: const Text('Cancelar'),
-            onPressed: () => Navigator.pop(dialogContext),
-          ),
-          TextButton(
-            child: const Text('¿Seguro que quieres seguir?'),
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              await FirebaseAuth.instance.signInAnonymously();
-              if (!dialogContext.mounted) return;
-              Navigator.pushReplacement(
-                dialogContext,
-                MaterialPageRoute(builder: (_) => const MainScreen()),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
+  showDialog(
+    context: context,
+    builder: (BuildContext dialogContext) => AlertDialog(
+      title: const Text('Advertencia'),
+      content: const Text('Si se borra la app, los datos no quedarán guardados.'),
+      actions: [
+        TextButton(
+          child: const Text('Cancelar'),
+          onPressed: () => Navigator.pop(dialogContext),
+        ),
+        TextButton(
+          child: const Text('¿Seguro que quieres seguir?'),
+          onPressed: () async {
+            Navigator.pop(dialogContext);
+            await FirebaseAuth.instance.signInAnonymously();
+            Navigator.pushReplacement(
+              context, // <--- usa este context
+              MaterialPageRoute(builder: (_) => const MainScreen()),
+            );
+          },
+        ),
+      ],
+    ),
+  );
+}
+
 
   @override
   Widget build(BuildContext context) {

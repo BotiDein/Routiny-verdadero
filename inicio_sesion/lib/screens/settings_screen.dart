@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../auth/login_page.dart';
+import '../auth/landing_page.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -115,35 +116,45 @@ class SettingsScreen extends StatelessWidget {
   }
 
   void _confirmLogout(BuildContext context) async {
-    final user = FirebaseAuth.instance.currentUser;
+  final user = FirebaseAuth.instance.currentUser;
 
-    if (user == null) {
-      _showMessageDialog(
-        context,
-        title: 'Sin cuenta activa',
-        message: 'Aún no has ingresado una cuenta, ¿quieres salir de la aplicación?',
-        onConfirm: () => Navigator.of(context).pop(),
-      );
-    } else {
-      _showMessageDialog(
-        context,
-        title: 'Cerrar sesión',
-        message: '¿Estás seguro de que quieres seguir?',
-        onConfirm: () async {
-          Navigator.of(context).pop(); // Cierra el diálogo primero
+  if (user == null) {
+    _showMessageDialog(
+      context,
+      title: 'Sin cuenta activa',
+      message: 'Aún no has ingresado una cuenta, ¿quieres salir de la aplicación?',
+      onConfirm: () {
+        Navigator.of(context).pop(); // Cierra el diálogo
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const LandingPage()),
+          (_) => false,
+        );
+      },
+    );
+  } else {
+    _showMessageDialog(
+      context,
+      title: 'Cerrar sesión',
+      message: '¿Estás seguro de que quieres seguir?',
+      onConfirm: () async {
+        Navigator.of(context).pop(); // Cierra el diálogo primero
+        await FirebaseAuth.instance.signOut();
 
-          await FirebaseAuth.instance.signOut(); // Luego espera
+        // Redirige a la página de inicio limpia
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const LandingPage()),
+          (_) => false,
+        );
 
-          // Espera un breve momento para garantizar que el contexto esté listo
-          Future.delayed(const Duration(milliseconds: 100), () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Sesión cerrada')),
-            );
-          });
-        },
-      );
-    }
+        // Opcional: mostrar mensaje después de redirigir
+        // Puedes mostrarlo en LandingPage si quieres
+      },
+    );
   }
+}
+
 
   void _showMessageDialog(BuildContext context,
       {required String title, required String message, required VoidCallback onConfirm}) {
