@@ -430,174 +430,156 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   ..._tasks.map(
-                                    (task) => Dismissible(
-                                      key: Key(task.id),
-                                      background: Container(
-                                        color: Colors.red,
-                                        alignment: Alignment.centerRight,
-                                        padding: const EdgeInsets.only(
-                                          right: 20,
-                                        ),
-                                        child: const Icon(
-                                          Icons.delete,
-                                          color: Colors.white,
-                                        ),
+                                    (task) => Padding(
+                                      padding: EdgeInsets.only(
+                                        bottom: screenHeight * 0.01,
                                       ),
-                                      direction: DismissDirection.endToStart,
-                                      onDismissed: (direction) {
-                                        _deleteTask(task);
-                                      },
-                                      child: Padding(
-                                        padding: EdgeInsets.only(
-                                          bottom: screenHeight * 0.01,
-                                        ),
-                                        child: ListTile(
-                                          contentPadding: EdgeInsets.zero,
-                                          leading: GestureDetector(
-                                            onTap:
-                                                () =>
-                                                    _toggleTaskCompletion(task),
-                                            child: Container(
-                                              padding: const EdgeInsets.all(2),
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
+                                      child: ListTile(
+                                        contentPadding: EdgeInsets.zero,
+                                        leading: GestureDetector(
+                                          onTap:
+                                              () =>
+                                                  _toggleTaskCompletion(task),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(2),
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color:
+                                                  task.isCompleted
+                                                      ? _getPriorityColor(
+                                                        task.priority,
+                                                      )
+                                                      : Colors.transparent,
+                                              border: Border.all(
                                                 color:
                                                     task.isCompleted
                                                         ? _getPriorityColor(
                                                           task.priority,
                                                         )
-                                                        : Colors.transparent,
-                                                border: Border.all(
-                                                  color:
-                                                      task.isCompleted
-                                                          ? _getPriorityColor(
-                                                            task.priority,
-                                                          )
-                                                          : Colors.grey,
-                                                  width: 2,
-                                                ),
+                                                        : Colors.grey,
+                                                width: 2,
                                               ),
-                                              child:
-                                                  task.isCompleted
-                                                      ? Icon(
-                                                        Icons.check,
-                                                        size: fontSize,
-                                                        color: Colors.white,
-                                                      )
-                                                      : const SizedBox(
-                                                        width: 20,
-                                                        height: 20,
-                                                      ),
                                             ),
+                                            child:
+                                                task.isCompleted
+                                                    ? Icon(
+                                                      Icons.check,
+                                                      size: fontSize,
+                                                      color: Colors.white,
+                                                    )
+                                                    : const SizedBox(
+                                                      width: 20,
+                                                      height: 20,
+                                                    ),
                                           ),
-                                          title: Text(
-                                            task.title,
-                                            style: TextStyle(
-                                              fontSize: fontSize,
-                                              fontWeight: FontWeight.w500,
-                                              decoration:
-                                                  task.isCompleted
-                                                      ? TextDecoration
-                                                          .lineThrough
-                                                      : null,
-                                              color:
-                                                  task.isCompleted
-                                                      ? Colors.grey
-                                                      : Colors.black,
-                                            ),
+                                        ),
+                                        title: Text(
+                                          task.title,
+                                          style: TextStyle(
+                                            fontSize: fontSize,
+                                            fontWeight: FontWeight.w500,
+                                            decoration:
+                                                task.isCompleted
+                                                    ? TextDecoration
+                                                        .lineThrough
+                                                    : null,
+                                            color:
+                                                task.isCompleted
+                                                    ? Colors.grey
+                                                    : Colors.black,
                                           ),
-                                          subtitle: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              if (task
-                                                  .description
-                                                  .isNotEmpty) ...[
+                                        ),
+                                        subtitle: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            if (task
+                                                .description
+                                                .isNotEmpty) ...[
+                                              Text(
+                                                task.description,
+                                                style: TextStyle(
+                                                  fontSize: smallFontSize,
+                                                  color: Colors.grey[700],
+                                                  decoration:
+                                                      task.isCompleted
+                                                          ? TextDecoration
+                                                              .lineThrough
+                                                          : null,
+                                                ),
+                                                maxLines: 2,
+                                                overflow:
+                                                    TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 4),
+                                            ],
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.access_time,
+                                                  size: smallFontSize,
+                                                  color: Colors.grey[600],
+                                                ),
+                                                const SizedBox(width: 4),
                                                 Text(
-                                                  task.description,
+                                                  DateFormat(
+                                                    'HH:mm',
+                                                  ).format(task.date),
                                                   style: TextStyle(
                                                     fontSize: smallFontSize,
-                                                    color: Colors.grey[700],
-                                                    decoration:
-                                                        task.isCompleted
-                                                            ? TextDecoration
-                                                                .lineThrough
-                                                            : null,
-                                                  ),
-                                                  maxLines: 2,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                                const SizedBox(height: 4),
-                                              ],
-                                              Row(
-                                                children: [
-                                                  Icon(
-                                                    Icons.access_time,
-                                                    size: smallFontSize,
                                                     color: Colors.grey[600],
                                                   ),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    DateFormat(
-                                                      'HH:mm',
-                                                    ).format(task.date),
-                                                    style: TextStyle(
-                                                      fontSize: smallFontSize,
-                                                      color: Colors.grey[600],
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  Container(
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                          horizontal: 6,
-                                                          vertical: 2,
-                                                        ),
-                                                    decoration: BoxDecoration(
-                                                      color: _getPriorityColor(
-                                                        task.priority,
-                                                      ).withOpacity(0.2),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            4,
-                                                          ),
-                                                    ),
-                                                    child: Text(
-                                                      _getPriorityText(
-                                                        task.priority,
-                                                      ),
-                                                      style: TextStyle(
-                                                        fontSize:
-                                                            smallFontSize * 0.9,
-                                                        color:
-                                                            _getPriorityColor(
-                                                              task.priority,
-                                                            ),
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                          trailing: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              IconButton(
-                                                icon: const Icon(Icons.edit),
-                                                onPressed: () => _navigateToTaskForm(
-                                                  task: task,
                                                 ),
+                                                const SizedBox(width: 8),
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2,
+                                                      ),
+                                                  decoration: BoxDecoration(
+                                                    color: _getPriorityColor(
+                                                      task.priority,
+                                                    ).withOpacity(0.2),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          4,
+                                                        ),
+                                                  ),
+                                                  child: Text(
+                                                    _getPriorityText(
+                                                      task.priority,
+                                                    ),
+                                                    style: TextStyle(
+                                                      fontSize:
+                                                          smallFontSize * 0.9,
+                                                      color:
+                                                          _getPriorityColor(
+                                                            task.priority,
+                                                          ),
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                        trailing: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            IconButton(
+                                              icon: const Icon(Icons.edit),
+                                              onPressed: () => _navigateToTaskForm(
+                                                task: task,
                                               ),
-                                              IconButton(
-                                                icon: const Icon(Icons.delete, color: Colors.red),
-                                                onPressed: () => _showDeleteConfirmation(task),
-                                              ),
-                                            ],
-                                          ),
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(Icons.delete, color: Colors.red),
+                                              onPressed: () => _showDeleteConfirmation(task),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
