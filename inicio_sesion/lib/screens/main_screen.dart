@@ -57,6 +57,7 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF4A90E2),
+        automaticallyImplyLeading: false, // <-- Añade esto
         title: Text(
           _pageTitles[_selectedIndex],
           style: TextStyle(

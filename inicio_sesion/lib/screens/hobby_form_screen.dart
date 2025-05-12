@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../widgets/category_dialog.dart';
 
 class HobbyFormScreen extends StatefulWidget {
   final Map<String, dynamic>? hobby;
@@ -20,26 +19,11 @@ class _HobbyFormScreenState extends State<HobbyFormScreen> {
   final TextEditingController _weeklyGoalController = TextEditingController();
   
   String _selectedEmoji = '😊';
-  String _selectedCategory = 'Música';
   
   final List<String> _emojis = [
-    '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
-    '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚',
-    '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩',
-    '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣',
-    '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬',
-    '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗',
-    '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯',
-  ];
-  
-  final List<String> _categories = [
-    'Música',
-    'Deportes',
-    'Arte',
-    'Lectura',
-    'Cocina',
-    'Viajes',
-    'Tecnología',
+      '😊', '🏃', '🧠', '📚', '💼', '🍎', '💪', '🧘', '🎯', '⚽',
+      '🎮', '🎨', '🎵', '🍳', '🌱', '💻', '🏠', '🚗', '✈️', '🛒',
+      '💰', '🎓', '🔬', '🧪', '🧬', '🔭', '📱', '📷', '🎬', '📺',
   ];
 
   @override
@@ -50,7 +34,6 @@ class _HobbyFormScreenState extends State<HobbyFormScreen> {
     if (widget.isEditing && widget.hobby != null) {
       _nameController.text = widget.hobby!['name'] ?? '';
       _selectedEmoji = widget.hobby!['icon'] ?? '😊';
-      _selectedCategory = widget.hobby!['category'] ?? 'Música';
       
       // Extraer la meta semanal si existe
       if (widget.hobby!['weeklyGoal'] != null) {
@@ -69,22 +52,7 @@ class _HobbyFormScreenState extends State<HobbyFormScreen> {
     super.dispose();
   }
   
-  void _showCategoryDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return CategoryDialog(
-          categories: _categories,
-          selectedCategory: _selectedCategory,
-          onCategorySelected: (category) {
-            setState(() {
-              _selectedCategory = category;
-            });
-          },
-        );
-      },
-    );
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -131,33 +99,6 @@ class _HobbyFormScreenState extends State<HobbyFormScreen> {
                   ),
                   filled: true,
                   fillColor: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 24),
-              
-              // Categoría
-              const Text(
-                'Categoría',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              GestureDetector(
-                onTap: _showCategoryDialog,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: Text(
-                    _selectedCategory,
-                    style: const TextStyle(fontSize: 16),
-                  ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -244,7 +185,6 @@ class _HobbyFormScreenState extends State<HobbyFormScreen> {
                       Navigator.pop(context, {
                         'name': _nameController.text,
                         'icon': _selectedEmoji,
-                        'category': _selectedCategory,
                         'time': '00:00:00',
                         'weeklyGoal': _weeklyGoalController.text.isNotEmpty 
                             ? '${_weeklyGoalController.text}:00:00' 
