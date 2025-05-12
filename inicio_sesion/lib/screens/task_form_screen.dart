@@ -562,7 +562,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                   
+                  
                     
                     // Botón de eliminar (solo en modo edición)
                     if (widget.isEditing)
