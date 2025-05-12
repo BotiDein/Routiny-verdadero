@@ -188,6 +188,68 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     );
   }
 
+  // Mostrar diálogo de confirmación para eliminar tarea
+  void _showDeleteConfirmation() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Eliminar tarea'),
+          content: Text('¿Estás seguro de que deseas eliminar la tarea "${widget.task!.title}"?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deleteTask();
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Eliminar tarea
+  Future<void> _deleteTask() async {
+    if (widget.task == null) return;
+    
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await _firebaseService.deleteTask(widget.task!.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tarea eliminada')),
+        );
+        Navigator.pop(context, true); // Regresar a la pantalla anterior
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al eliminar: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   Future<void> _saveTask() async {
     if (_titleController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -500,17 +562,21 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(120, 45),
+                   
+                    
+                    // Botón de eliminar (solo en modo edición)
+                    if (widget.isEditing)
+                      ElevatedButton(
+                        onPressed: _showDeleteConfirmation,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(120, 45),
+                        ),
+                        child: const Text('Eliminar'),
                       ),
-                      child: const Text('Cancelar'),
-                    ),
+                    
+                    // Botón de guardar/crear
                     ElevatedButton(
                       onPressed: _isLoading ? null : _saveTask,
                       style: ElevatedButton.styleFrom(

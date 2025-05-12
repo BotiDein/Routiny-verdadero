@@ -65,6 +65,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
       if (mounted) {
         setState(() {
           _datesWithTasks = dates;
+          print('Fechas con tareas: ${_datesWithTasks.length}');
+          for (var date in _datesWithTasks) {
+            print('Fecha con tarea: ${DateFormat('yyyy-MM-dd').format(date)}');
+          }
         });
       }
     } catch (e) {
@@ -158,6 +162,37 @@ class _CalendarScreenState extends State<CalendarScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
     }
+  }
+
+  // Muestra un diálogo de confirmación para eliminar una tarea
+  void _showDeleteConfirmation(Task task) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Eliminar tarea'),
+          content: Text('¿Estás seguro de que deseas eliminar la tarea "${task.title}"?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deleteTask(task);
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -548,12 +583,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                               ),
                                             ],
                                           ),
-                                          trailing: IconButton(
-                                            icon: const Icon(Icons.edit),
-                                            onPressed:
-                                                () => _navigateToTaskForm(
+                                          trailing: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              IconButton(
+                                                icon: const Icon(Icons.edit),
+                                                onPressed: () => _navigateToTaskForm(
                                                   task: task,
                                                 ),
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(Icons.delete, color: Colors.red),
+                                                onPressed: () => _showDeleteConfirmation(task),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ),
