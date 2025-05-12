@@ -162,8 +162,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           content: const SingleChildScrollView(
             child: Text(
-              'Lorem ipsum dolor sit amet, consectetur adipiscing elit. '
-              'Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+              'ROUTINY es una app móvil para organizar tu rutina y mejorar tu bienestar personal, académico y emocional. '
+              'Diseñada para estudiantes, freelancers y cualquier persona que quiera gestionar mejor su tiempo.\n\n'
+              'Incluye herramientas para seguir hábitos saludables, organizar tareas académicas, registrar hobbies y ver resúmenes de tu progreso. '
+              'Todo esto en una interfaz sencilla, sin funciones comerciales, y con protección de tus datos.',
               style: TextStyle(fontFamily: 'Roboto'),
             ),
           ),
@@ -177,6 +179,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       },
     );
   }
+
 
   void _showSuggestionDialog(BuildContext context) {
     final TextEditingController suggestionController = TextEditingController();
