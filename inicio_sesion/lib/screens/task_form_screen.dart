@@ -7,8 +7,14 @@ import '../services/firebase_service.dart';
 class TaskFormScreen extends StatefulWidget {
   final Task? task;
   final bool isEditing;
+  final DateTime? initialDate;
 
-  const TaskFormScreen({super.key, this.task, this.isEditing = false});
+  const TaskFormScreen({
+    super.key, 
+    this.task, 
+    this.isEditing = false,
+    this.initialDate,
+  });
 
   @override
   State<TaskFormScreen> createState() => _TaskFormScreenState();
@@ -42,8 +48,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     final userId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
     _firebaseService = FirebaseService(userId);
 
-    // Inicializar con la fecha y hora actual
-    _selectedDate = DateTime.now();
+    // Inicializar con la fecha y hora actual o la fecha proporcionada
+    _selectedDate = widget.initialDate ?? DateTime.now();
     _selectedTime = TimeOfDay.now();
 
     // Si estamos editando, cargar los datos de la tarea
