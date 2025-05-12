@@ -16,6 +16,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
   late FirebaseService _firebaseService;
   Map<String, List<Task>> _tasksByDate = {};
   bool _isLoading = true;
+  Task? _lastDeletedTask; // Para almacenar la última tarea eliminada
 
   @override
   void initState() {
@@ -70,15 +71,59 @@ class _AgendaScreenState extends State<AgendaScreen> {
   }
 
   Future<void> _deleteTask(Task task) async {
+    // Guardar la tarea antes de eliminarla para poder restaurarla
+    _lastDeletedTask = task;
+    
     try {
       await _firebaseService.deleteTask(task.id);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Tarea eliminada')));
+      
+      // Mostrar SnackBar con opción de deshacer
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars(); // Limpiar SnackBars anteriores
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Tarea eliminada'),
+            action: SnackBarAction(
+              label: 'DESHACER',
+              onPressed: () {
+                _undoDelete();
+              },
+            ),
+            duration: const Duration(seconds: 5), // Dar tiempo suficiente para deshacer
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al eliminar: ${e.toString()}')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al eliminar: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  // Método para deshacer la eliminación
+  Future<void> _undoDelete() async {
+    if (_lastDeletedTask != null) {
+      try {
+        // Restaurar la tarea eliminada
+        await _firebaseService.addTask(_lastDeletedTask!);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Tarea restaurada')),
+          );
+        }
+        
+        // Limpiar la referencia a la tarea eliminada
+        _lastDeletedTask = null;
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al restaurar: ${e.toString()}')),
+          );
+        }
+      }
     }
   }
 

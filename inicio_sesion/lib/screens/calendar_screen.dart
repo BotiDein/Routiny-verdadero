@@ -65,6 +65,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
       if (mounted) {
         setState(() {
           _datesWithTasks = dates;
+          print('Fechas con tareas: ${_datesWithTasks.length}');
+          for (var date in _datesWithTasks) {
+            print('Fecha con tarea: ${DateFormat('yyyy-MM-dd').format(date)}');
+          }
         });
       }
     } catch (e) {
@@ -117,8 +121,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder:
-            (context) => TaskFormScreen(task: task, isEditing: task != null),
+        builder: (context) => TaskFormScreen(
+          task: task, 
+          isEditing: task != null,
+          initialDate: _selectedDate,
+        ),
       ),
     );
 
@@ -155,6 +162,37 @@ class _CalendarScreenState extends State<CalendarScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
     }
+  }
+
+  // Muestra un diálogo de confirmación para eliminar una tarea
+  void _showDeleteConfirmation(Task task) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Eliminar tarea'),
+          content: Text('¿Estás seguro de que deseas eliminar la tarea "${task.title}"?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deleteTask(task);
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -197,7 +235,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     ),
                     SizedBox(height: screenHeight * 0.01),
 
-                    // Fecha seleccionada con botón de edición
+                    // Fecha seleccionada (sin botón de edición)
                     Container(
                       padding: EdgeInsets.symmetric(
                         vertical: screenHeight * 0.01,
@@ -219,35 +257,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                               fontSize: largeFontSize,
                               fontWeight: FontWeight.bold,
                             ),
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.edit, size: fontSize * 1.2),
-                            onPressed: () async {
-                              // Mostrar selector de fecha
-                              final pickedDate = await showDatePicker(
-                                context: context,
-                                initialDate: _selectedDate,
-                                firstDate: DateTime(2020),
-                                lastDate: DateTime(2030),
-                              );
-
-                              if (pickedDate != null) {
-                                _onDateSelected(pickedDate);
-
-                                // Actualizar el mes actual si es necesario
-                                if (pickedDate.month != _currentMonth.month ||
-                                    pickedDate.year != _currentMonth.year) {
-                                  setState(() {
-                                    _currentMonth = DateTime(
-                                      pickedDate.year,
-                                      pickedDate.month,
-                                      1,
-                                    );
-                                  });
-                                  _loadDatesWithTasks();
-                                }
-                              }
-                            },
                           ),
                         ],
                       ),
@@ -574,12 +583,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                               ),
                                             ],
                                           ),
-                                          trailing: IconButton(
-                                            icon: const Icon(Icons.edit),
-                                            onPressed:
-                                                () => _navigateToTaskForm(
+                                          trailing: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              IconButton(
+                                                icon: const Icon(Icons.edit),
+                                                onPressed: () => _navigateToTaskForm(
                                                   task: task,
                                                 ),
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(Icons.delete, color: Colors.red),
+                                                onPressed: () => _showDeleteConfirmation(task),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ),

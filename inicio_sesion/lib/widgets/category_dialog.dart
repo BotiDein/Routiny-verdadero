@@ -111,12 +111,6 @@ class _CategoryDialogState extends State<CategoryDialog> {
             children: [
               TextButton(
                 onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: const Text('Cancelar'),
-              ),
-              TextButton(
-                onPressed: () {
                   _showAddCategoryDialog(context);
                 },
                 child: const Text('Crear o Editar'),
