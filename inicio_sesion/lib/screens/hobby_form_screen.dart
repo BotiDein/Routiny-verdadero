@@ -38,8 +38,8 @@ class _HobbyFormScreenState extends State<HobbyFormScreen> {
       // Extraer la meta semanal si existe
       if (widget.hobby!['weeklyGoal'] != null) {
         final parts = widget.hobby!['weeklyGoal'].split(':');
-        if (parts.isNotEmpty) {
-          _weeklyGoalController.text = parts[0]; // Tomamos solo las horas
+        if (parts.length >= 1) {
+          _weeklyGoalController.text = parts[0].padStart(2, '0'); // Tomamos solo las horas
         }
       }
     }
@@ -52,8 +52,6 @@ class _HobbyFormScreenState extends State<HobbyFormScreen> {
     super.dispose();
   }
   
-
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -182,13 +180,17 @@ class _HobbyFormScreenState extends State<HobbyFormScreen> {
                   onPressed: () {
                     if (_nameController.text.isNotEmpty) {
                       // Crear un nuevo hobby y volver a la pantalla anterior
+                      final hours = _weeklyGoalController.text.isNotEmpty 
+                          ? _weeklyGoalController.text.padLeft(2, '0')
+                          : '05';
+                          
                       Navigator.pop(context, {
                         'name': _nameController.text,
                         'icon': _selectedEmoji,
                         'time': '00:00:00',
-                        'weeklyGoal': _weeklyGoalController.text.isNotEmpty 
-                            ? '${_weeklyGoalController.text}:00:00' 
-                            : '05:00:00',
+                        'weeklyGoal': '$hours:00:00',
+                        'registeredTimes': [], // Inicializar como lista vacía
+                        'activeDays': [], // Inicializar como lista vacía
                       });
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(

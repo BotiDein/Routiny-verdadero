@@ -13,19 +13,16 @@ class HobbyDetailScreen extends StatefulWidget {
 }
 
 class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
-  String _totalTime = '03:10:00';
+  String _totalTime = '00:00:00';
   String _weeklyGoal = '05:00:00';
   bool _goalCompleted = false;
+  bool _goalExceeded = false;
 
-  // Lista de tiempos registrados
-  final List<Map<String, dynamic>> _registeredTimes = [
-    {'date': DateTime(2025, 4, 15), 'time': '01:00:00'},
-    {'date': DateTime(2025, 4, 17), 'time': '02:00:00'},
-    {'date': DateTime(2025, 4, 18), 'time': '01:10:00'},
-  ];
+  // Lista de tiempos registrados - inicializada como vacía
+  List<Map<String, dynamic>> _registeredTimes = [];
 
   // Días con actividad (0 = domingo, 6 = sábado)
-  final List<int> _activeDays = [2, 4]; // Martes y Jueves
+  final List<int> _activeDays = []; // Inicializada como vacía
 
   @override
   void initState() {
@@ -34,6 +31,28 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
     if (widget.hobby.containsKey('weeklyGoal')) {
       _weeklyGoal = widget.hobby['weeklyGoal'];
     }
+    
+    // Inicializar tiempos registrados si existen en el hobby
+    if (widget.hobby.containsKey('registeredTimes') && 
+        widget.hobby['registeredTimes'] is List) {
+      _registeredTimes = List<Map<String, dynamic>>.from(widget.hobby['registeredTimes']);
+    } else {
+      // Si no existen, inicializar como una lista vacía y guardarla en el hobby
+      _registeredTimes = [];
+      widget.hobby['registeredTimes'] = _registeredTimes;
+    }
+    
+    // Inicializar días activos si existen en el hobby
+    if (widget.hobby.containsKey('activeDays') && 
+        widget.hobby['activeDays'] is List) {
+      _activeDays.clear();
+      _activeDays.addAll(List<int>.from(widget.hobby['activeDays']));
+    } else {
+      // Si no existen, guardar la lista vacía en el hobby
+      widget.hobby['activeDays'] = _activeDays;
+    }
+    
+    _calculateTotalTime();
     _checkGoalCompletion();
   }
 
@@ -60,8 +79,18 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
               'date': DateTime.now(),
               'time': formattedTime,
             });
-            // Actualizar tiempo total (simplificado)
-            _totalTime = _calculateTotalTime();
+            // Actualizar la lista en el hobby
+            widget.hobby['registeredTimes'] = _registeredTimes;
+            
+            // Actualizar días activos
+            final today = DateTime.now().weekday % 7;
+            if (!_activeDays.contains(today)) {
+              _activeDays.add(today);
+              widget.hobby['activeDays'] = _activeDays;
+            }
+            
+            // Actualizar tiempo total
+            _calculateTotalTime();
             // Verificar si se cumplió la meta
             _checkGoalCompletion();
           });
@@ -217,8 +246,18 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
                     'date': DateTime.now(),
                     'time': newTime,
                   });
-                  // Actualizar tiempo total (simplificado)
-                  _totalTime = _calculateTotalTime();
+                  // Actualizar la lista en el hobby
+                  widget.hobby['registeredTimes'] = _registeredTimes;
+                  
+                  // Actualizar días activos
+                  final today = DateTime.now().weekday % 7;
+                  if (!_activeDays.contains(today)) {
+                    _activeDays.add(today);
+                    widget.hobby['activeDays'] = _activeDays;
+                  }
+                  
+                  // Actualizar tiempo total
+                  _calculateTotalTime();
                   // Verificar si se cumplió la meta
                   _checkGoalCompletion();
                 });
@@ -232,16 +271,51 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
     );
   }
 
-  String _calculateTotalTime() {
-    // Esta es una implementación simplificada
-    // En una app real, convertirías los tiempos a segundos, los sumarías y luego los convertirías de nuevo
-    return _totalTime; // Por ahora solo devolvemos el valor fijo
+  // Convertir tiempo en formato HH:MM:SS a segundos
+  int _timeToSeconds(String time) {
+    final parts = time.split(':');
+    if (parts.length != 3) return 0;
+    
+    final hours = int.tryParse(parts[0]) ?? 0;
+    final minutes = int.tryParse(parts[1]) ?? 0;
+    final seconds = int.tryParse(parts[2]) ?? 0;
+    
+    return hours * 3600 + minutes * 60 + seconds;
+  }
+  
+  // Convertir segundos a formato HH:MM:SS
+  String _secondsToTime(int seconds) {
+    final hours = seconds ~/ 3600;
+    final minutes = (seconds % 3600) ~/ 60;
+    final secs = seconds % 60;
+    
+    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+  }
+
+  void _calculateTotalTime() {
+    int totalSeconds = 0;
+    
+    for (var timeEntry in _registeredTimes) {
+      totalSeconds += _timeToSeconds(timeEntry['time']);
+    }
+    
+    setState(() {
+      _totalTime = _secondsToTime(totalSeconds);
+      // Actualizar el tiempo en el hobby original para que se refleje en la lista
+      widget.hobby['time'] = _totalTime;
+    });
   }
 
   void _checkGoalCompletion() {
-    // Implementación simplificada
+    final totalSeconds = _timeToSeconds(_totalTime);
+    final goalSeconds = _timeToSeconds(_weeklyGoal);
+    
     setState(() {
-      _goalCompleted = false; // Siempre no cumplido para este ejemplo
+      _goalCompleted = totalSeconds >= goalSeconds;
+      
+      // Verificar si se excedió la meta por 5 horas o más
+      final fiveHoursInSeconds = 5 * 3600; // 5 horas en segundos
+      _goalExceeded = totalSeconds >= (goalSeconds + fiveHoursInSeconds);
     });
   }
 
@@ -254,8 +328,19 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
       ),
     ).then((updatedHobby) {
       if (updatedHobby != null) {
-        // Actualizar el hobby en la lista principal
-        // Esto requeriría una implementación más completa con gestión de estado
+        // Actualizar el hobby con los nuevos datos
+        setState(() {
+          if (updatedHobby.containsKey('weeklyGoal')) {
+            _weeklyGoal = updatedHobby['weeklyGoal'];
+            // Actualizar el hobby original
+            widget.hobby['weeklyGoal'] = updatedHobby['weeklyGoal'];
+            widget.hobby['name'] = updatedHobby['name'];
+            widget.hobby['icon'] = updatedHobby['icon'];
+          }
+          // Verificar si se cumplió la meta con el nuevo objetivo
+          _checkGoalCompletion();
+        });
+        
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Hobby actualizado')));
@@ -265,104 +350,105 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF4A90E2),
-        title: const Text(
-          'Detalles del Hobby',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+    return WillPopScope(
+      // Interceptar el botón de retroceso para devolver el hobby actualizado
+      onWillPop: () async {
+        Navigator.pop(context, widget.hobby);
+        return false;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF4A90E2),
+          title: const Text(
+            'Detalles del Hobby',
+            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          ),
+          centerTitle: true,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            onPressed: () => Navigator.of(context).pop(widget.hobby),
+          ),
         ),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
-      body: Container(
-        color: const Color(0xFFD6F9F0),
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            Text(
-              widget.hobby['name'],
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Tiempo total registrado',
-              style: TextStyle(fontSize: 16),
-              textAlign: TextAlign.center,
-            ),
-            Text(
-              _totalTime,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Meta Semanal',
-              style: TextStyle(fontSize: 16),
-              textAlign: TextAlign.center,
-            ),
-            Text(
-              _weeklyGoal,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  _goalCompleted ? 'Cumplido' : 'No cumplido',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: _goalCompleted ? Colors.green : Colors.red,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Icon(
-                  _goalCompleted ? Icons.check_circle : Icons.cancel,
-                  color: _goalCompleted ? Colors.green : Colors.red,
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            // Días con actividad
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.lightBlue.shade50,
-                borderRadius: BorderRadius.circular(12),
+        body: Container(
+          color: const Color(0xFFD6F9F0),
+          child: Column(
+            children: [
+              const SizedBox(height: 20),
+              Text(
+                widget.hobby['name'],
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
               ),
-              child: Column(
+              const SizedBox(height: 16),
+              const Text(
+                'Tiempo total registrado',
+                style: TextStyle(fontSize: 16),
+                textAlign: TextAlign.center,
+              ),
+              Text(
+                _totalTime,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Meta Semanal',
+                style: TextStyle(fontSize: 16),
+                textAlign: TextAlign.center,
+              ),
+              Text(
+                _weeklyGoal,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
-                    'Días con actividad',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center,
+                  Text(
+                    _goalCompleted ? 'Cumplido' : 'No cumplido',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: _goalCompleted ? Colors.green : Colors.red,
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildDayCircle('D', 0),
-                      _buildDayCircle('L', 1),
-                      _buildDayCircle('M', 2),
-                      _buildDayCircle('X', 3),
-                      _buildDayCircle('J', 4),
-                      _buildDayCircle('V', 5),
-                      _buildDayCircle('S', 6),
-                    ],
+                  const SizedBox(width: 8),
+                  Icon(
+                    _goalCompleted ? Icons.check_circle : Icons.cancel,
+                    color: _goalCompleted ? Colors.green : Colors.red,
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 16),
-            // Tiempos registrados
-            Expanded(
-              child: Container(
+              
+              // Aviso de exceso de meta
+              if (_goalExceeded)
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '¡Atención! Has excedido tu meta semanal por más de 5 horas.',
+                          style: TextStyle(
+                            color: Colors.orange.shade900,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              
+              const SizedBox(height: 20),
+              // Días con actividad
+              Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -372,145 +458,186 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
                 child: Column(
                   children: [
                     const Text(
-                      'Tiempos registrados',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      'Días con actividad',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 8),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: _registeredTimes.length,
-                        itemBuilder: (context, index) {
-                          final dateFormat = DateFormat('dd MMMM yyyy', 'es');
-                          final formattedDate = dateFormat.format(
-                            _registeredTimes[index]['date'],
-                          );
-
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8.0),
-                            child: Row(
-                              children: [
-                                Text(
-                                  formattedDate,
-                                  style: const TextStyle(fontSize: 16),
-                                ),
-                                const Expanded(
-                                  child: Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 8.0,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        SizedBox(width: 8),
-                                        Expanded(
-                                          child: Divider(
-                                            color: Colors.blue,
-                                            thickness: 1,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                const Icon(Icons.alarm, size: 16),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _registeredTimes[index]['time'],
-                                  style: const TextStyle(fontSize: 16),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildDayCircle('D', 0),
+                        _buildDayCircle('L', 1),
+                        _buildDayCircle('M', 2),
+                        _buildDayCircle('X', 3),
+                        _buildDayCircle('J', 4),
+                        _buildDayCircle('V', 5),
+                        _buildDayCircle('S', 6),
+                      ],
                     ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            // Botones inferiores
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  Row(
+              const SizedBox(height: 16),
+              // Tiempos registrados
+              Expanded(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.lightBlue.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
                     children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _startTimer,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0D47A1),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: const Text(
-                            'Iniciar Cronómetro',
-                            style: TextStyle(fontSize: 16),
-                          ),
+                      const Text(
+                        'Tiempos registrados',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
                         ),
+                        textAlign: TextAlign.center,
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(height: 8),
                       Expanded(
-                        child: ElevatedButton(
-                          onPressed: _showRegisterTimeDialog,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0D47A1),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: const Text(
-                            'Registrar Tiempo',
-                            style: TextStyle(fontSize: 16),
-                          ),
-                        ),
+                        child: _registeredTimes.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'No hay tiempos registrados.\nUtiliza los botones de abajo para registrar tiempo.',
+                                  textAlign: TextAlign.center,
+                                ),
+                              )
+                            : ListView.builder(
+                                itemCount: _registeredTimes.length,
+                                itemBuilder: (context, index) {
+                                  final dateFormat = DateFormat('dd MMMM yyyy', 'es');
+                                  final formattedDate = dateFormat.format(
+                                    _registeredTimes[index]['date'],
+                                  );
+
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                    child: Row(
+                                      children: [
+                                        Text(
+                                          formattedDate,
+                                          style: const TextStyle(fontSize: 16),
+                                        ),
+                                        const Expanded(
+                                          child: Padding(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 8.0,
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                SizedBox(width: 8),
+                                                Expanded(
+                                                  child: Divider(
+                                                    color: Colors.blue,
+                                                    thickness: 1,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                        const Icon(Icons.alarm, size: 16),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          _registeredTimes[index]['time'],
+                                          style: const TextStyle(fontSize: 16),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            // Implementar eliminación
-                            Navigator.of(context).pop();
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: const Text(
-                            'Eliminar',
-                            style: TextStyle(fontSize: 16),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _editHobby,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0D47A1),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: const Text(
-                            'Editar',
-                            style: TextStyle(fontSize: 16),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              // Botones inferiores
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _startTimer,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0D47A1),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            child: const Text(
+                              'Iniciar Cronómetro',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _showRegisterTimeDialog,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0D47A1),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            child: const Text(
+                              'Registrar Tiempo',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              // Implementar eliminación
+                              Navigator.of(context).pop();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            child: const Text(
+                              'Eliminar',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _editHobby,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0D47A1),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            child: const Text(
+                              'Editar',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
