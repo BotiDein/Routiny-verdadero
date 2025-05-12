@@ -23,7 +23,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   String _selectedCategory = 'General';
   int _selectedPriority = 2;
 
-  List<String> _categories = [
+  final List<String> _categories = [
     'General',
     'Trabajo',
     'Personal',
