@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Agregar esta importación
 import '../screens/main_screen.dart';
 import 'login_page.dart';
 import '../auth/landing_page.dart';
@@ -29,39 +30,53 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> register() async {
-    if (!mounted) return;
+  if (!mounted) return;
 
-    if (passwordController.text != confirmPasswordController.text) {
-      setState(() => error = 'Las contraseñas no coinciden');
-      return;
-    }
+  if (passwordController.text != confirmPasswordController.text) {
+    setState(() => error = 'Las contraseñas no coinciden');
+    return;
+  }
 
-    setState(() {
-      isLoading = true;
-      error = '';
+  setState(() {
+    isLoading = true;
+    error = '';
+  });
+
+  try {
+    // Crear el usuario con Firebase Auth
+    UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      email: emailController.text.trim(),
+      password: passwordController.text.trim(),
+    );
+    
+    // Guardar SOLO el nombre y email en Firestore
+    await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
+      'name': nameController.text.trim(),
+      'email': emailController.text.trim(),
+      // NO guardar la contraseña aquí
     });
 
-    try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
-      );
+    // También actualizar el displayName en el perfil de Auth
+    await userCredential.user!.updateDisplayName(nameController.text.trim());
 
-      if (!mounted) return;
+    if (!mounted) return;
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MainScreen()),
-      );
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      setState(() => error = e.message ?? 'Error');
-    } finally {
-      if (mounted) {
-        setState(() => isLoading = false);
-      }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const MainScreen()),
+    );
+  } on FirebaseAuthException catch (e) {
+    if (!mounted) return;
+    setState(() => error = e.message ?? 'Error');
+  } catch (e) {
+    if (!mounted) return;
+    setState(() => error = 'Error al guardar los datos: $e');
+  } finally {
+    if (mounted) {
+      setState(() => isLoading = false);
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {
