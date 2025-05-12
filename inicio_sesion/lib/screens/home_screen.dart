@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'summary.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -164,7 +165,12 @@ class HomeScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                onPressed: () {}, // Acción pendiente para el resumen
+                onPressed: () {
+                    Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ResumenPersonalScreen()),
+                );
+                },
                 child: Text(
                   'VER RESUMEN PERSONAL',
                   style: TextStyle(

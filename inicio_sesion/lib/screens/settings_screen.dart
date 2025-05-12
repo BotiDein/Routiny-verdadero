@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../auth/login_page.dart';
 import '../auth/landing_page.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -50,7 +49,7 @@ class SettingsScreen extends StatelessWidget {
               Icons.chat_bubble_outline,
               'Sugerencias',
               optionFontSize,
-              () => _handleSuggestion(context),
+              () => _showSuggestionDialog(context),
             ),
             SizedBox(height: scaleHeight(20)),
             _buildConfigItem(
@@ -92,47 +91,7 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  void _handleSuggestion(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      _showMessageDialog(
-        context,
-        title: 'Cuenta requerida',
-        message:
-            'Debe ingresar con una cuenta si desea mandarnos una sugerencia, ¿desea ir al inicio de sesión?',
-        onConfirm: () {
-          Navigator.of(context).pop();
-          // Navegar a la pantalla de inicio de sesión directamente
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (_) => const LoginPage()),
-            (_) => false, // Esto elimina las pantallas anteriores
-          );
-        },
-      );
-    } else {
-      _showSuggestionDialog(context);
-    }
-  }
-
   void _confirmLogout(BuildContext context) async {
-  final user = FirebaseAuth.instance.currentUser;
-
-  if (user == null) {
-    _showMessageDialog(
-      context,
-      title: 'Sin cuenta activa',
-      message: 'Aún no has ingresado una cuenta, ¿quieres salir de la aplicación?',
-      onConfirm: () {
-        Navigator.of(context).pop(); // Cierra el diálogo
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const LandingPage()),
-          (_) => false,
-        );
-      },
-    );
-  } else {
     _showMessageDialog(
       context,
       title: 'Cerrar sesión',
@@ -141,20 +100,14 @@ class SettingsScreen extends StatelessWidget {
         Navigator.of(context).pop(); // Cierra el diálogo primero
         await FirebaseAuth.instance.signOut();
 
-        // Redirige a la página de inicio limpia
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const LandingPage()),
           (_) => false,
         );
-
-        // Opcional: mostrar mensaje después de redirigir
-        // Puedes mostrarlo en LandingPage si quieres
       },
     );
   }
-}
-
 
   void _showMessageDialog(BuildContext context,
       {required String title, required String message, required VoidCallback onConfirm}) {
