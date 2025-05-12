@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../models/task.dart';
+import '../services/firebase_service.dart';
+import 'task_form_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -15,15 +19,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
   // Mes que se está mostrando actualmente
   DateTime _currentMonth = DateTime.now();
 
-  // Lista de tareas para el día seleccionado (simulada)
-  List<String> _tasks = [];
+  // Lista de tareas para el día seleccionado
+  List<Task> _tasks = [];
 
-  // Mapa que simula tareas para diferentes días
-  final Map<String, List<String>> _tasksByDate = {
-    '2025-08-17': ['Tarea 1', 'Tarea 2', 'Tarea 3', 'Tarea 4', 'Tarea 5'],
-    '2025-08-05': ['Reunión importante', 'Llamar al doctor'],
-    '2025-08-10': ['Entregar informe', 'Comprar regalo'],
-  };
+  // Fechas que tienen tareas
+  List<DateTime> _datesWithTasks = [];
+
+  // Servicio de Firebase
+  late FirebaseService _firebaseService;
+
+  bool _isLoading = true;
 
   // Formateadores de fecha
   late DateFormat _monthYearFormat;
@@ -34,24 +39,52 @@ class _CalendarScreenState extends State<CalendarScreen> {
   void initState() {
     super.initState();
 
+    // Obtener el ID del usuario actual o usar 'guest' si no hay usuario
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
+    _firebaseService = FirebaseService(userId);
+
     // Configurar los formateadores
     _monthYearFormat = DateFormat('MMMM yyyy', 'es_ES');
     _selectedDayFormat = DateFormat('EEE, MMM d', 'es_ES');
     _dayFormat = DateFormat('dd/MM/yyyy');
 
-    // Establecemos el mes actual a agosto 2025 para coincidir con la imagen
-    _currentMonth = DateTime(2025, 8, 1);
-    // Establecemos la fecha seleccionada al 17 de agosto de 2025
-    _selectedDate = DateTime(2025, 8, 17);
-    // Cargamos las tareas para la fecha seleccionada
+    // Cargar las tareas para la fecha seleccionada
     _loadTasksForSelectedDate();
+    // Cargar las fechas con tareas para el mes actual
+    _loadDatesWithTasks();
+  }
+
+  // Carga las fechas que tienen tareas para el mes actual
+  Future<void> _loadDatesWithTasks() async {
+    try {
+      final dates = await _firebaseService.getDatesWithTasks(
+        _currentMonth.year,
+        _currentMonth.month,
+      );
+
+      if (mounted) {
+        setState(() {
+          _datesWithTasks = dates;
+        });
+      }
+    } catch (e) {
+      print('Error al cargar fechas con tareas: $e');
+    }
   }
 
   // Carga las tareas para la fecha seleccionada
   void _loadTasksForSelectedDate() {
-    final dateKey = DateFormat('yyyy-MM-dd').format(_selectedDate);
     setState(() {
-      _tasks = _tasksByDate[dateKey] ?? [];
+      _isLoading = true;
+    });
+
+    _firebaseService.getTasksByDate(_selectedDate).listen((tasks) {
+      if (mounted) {
+        setState(() {
+          _tasks = tasks;
+          _isLoading = false;
+        });
+      }
     });
   }
 
@@ -68,6 +101,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     setState(() {
       _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1, 1);
     });
+    _loadDatesWithTasks();
   }
 
   // Cambia al mes siguiente
@@ -75,17 +109,52 @@ class _CalendarScreenState extends State<CalendarScreen> {
     setState(() {
       _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1, 1);
     });
+    _loadDatesWithTasks();
   }
 
-  // Muestra el diálogo para agregar una tarea
-  void _showAddTaskDialog() {
-    // Aquí se implementaría el diálogo para agregar una tarea
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Agregar tarea para ${_dayFormat.format(_selectedDate)}'),
-        duration: const Duration(seconds: 2),
+  // Navega a la pantalla de formulario de tareas
+  void _navigateToTaskForm({Task? task}) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (context) => TaskFormScreen(task: task, isEditing: task != null),
       ),
     );
+
+    if (result == true) {
+      // La tarea se guardó correctamente
+      _loadTasksForSelectedDate();
+      _loadDatesWithTasks();
+    }
+  }
+
+  // Elimina una tarea
+  Future<void> _deleteTask(Task task) async {
+    try {
+      await _firebaseService.deleteTask(task.id);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Tarea eliminada')));
+      _loadTasksForSelectedDate();
+      _loadDatesWithTasks();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al eliminar: ${e.toString()}')),
+      );
+    }
+  }
+
+  // Marca una tarea como completada o pendiente
+  Future<void> _toggleTaskCompletion(Task task) async {
+    try {
+      await _firebaseService.toggleTaskCompletion(task.id, !task.isCompleted);
+      _loadTasksForSelectedDate();
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+    }
   }
 
   @override
@@ -99,257 +168,458 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final smallFontSize = screenWidth * 0.035; // 3.5% para texto pequeño
     final largeFontSize = screenWidth * 0.055; // 5.5% para texto grande
 
-    return SingleChildScrollView(
-      child: Padding(
-        padding: EdgeInsets.all(screenWidth * 0.04), // 4% de padding
-        child: Column(
-          children: [
-            // Contenedor del calendario
-            Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFCCF9F9), // Color de fondo del calendario (azul muy claro)
-                borderRadius: BorderRadius.circular(fontSize),
-                border: Border.all(color: Colors.grey.withOpacity(0.3)),
-              ),
-              padding: EdgeInsets.all(screenWidth * 0.04),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Texto "Select date"
-                  Text(
-                    'Select date',
-                    style: TextStyle(
-                      fontSize: fontSize,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  SizedBox(height: screenHeight * 0.01),
-
-                  // Fecha seleccionada con botón de edición
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      vertical: screenHeight * 0.01,
-                      horizontal: screenWidth * 0.02,
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(color: Colors.grey.withOpacity(0.3)),
+    return SafeArea(
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.all(screenWidth * 0.04), // 4% de padding
+          child: Column(
+            children: [
+              // Contenedor del calendario
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(
+                    0xFFCCF9F9,
+                  ), // Color de fondo del calendario (azul muy claro)
+                  borderRadius: BorderRadius.circular(fontSize),
+                  border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                ),
+                padding: EdgeInsets.all(screenWidth * 0.04),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Texto "Select date"
+                    Text(
+                      'Seleccionar fecha',
+                      style: TextStyle(
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          _selectedDayFormat.format(_selectedDate),
-                          style: TextStyle(
-                            fontSize: largeFontSize,
-                            fontWeight: FontWeight.bold,
+                    SizedBox(height: screenHeight * 0.01),
+
+                    // Fecha seleccionada con botón de edición
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        vertical: screenHeight * 0.01,
+                        horizontal: screenWidth * 0.02,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(
+                            color: Colors.grey.withOpacity(0.3),
                           ),
                         ),
-                        IconButton(
-                          icon: Icon(Icons.edit, size: fontSize * 1.2),
-                          onPressed: () {
-                            // Aquí iría la lógica para editar la fecha manualmente
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Selector de mes con navegación
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      vertical: screenHeight * 0.015,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Dropdown para seleccionar mes/año
-                        Row(
-                          children: [
-                            Text(
-                              _monthYearFormat.format(_currentMonth),
-                              style: TextStyle(
-                                fontSize: fontSize,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Icon(Icons.arrow_drop_down, size: fontSize * 1.5),
-                          ],
-                        ),
-                        // Botones de navegación
-                        Row(
-                          children: [
-                            IconButton(
-                              icon: Icon(
-                                Icons.chevron_left,
-                                size: fontSize * 1.5,
-                              ),
-                              onPressed: _previousMonth,
-                            ),
-                            IconButton(
-                              icon: Icon(
-                                Icons.chevron_right,
-                                size: fontSize * 1.5,
-                              ),
-                              onPressed: _nextMonth,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Calendario
-                  _buildCalendarGrid(fontSize),
-
-                  // Botón para agregar tarea
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Padding(
-                      padding: EdgeInsets.only(top: screenHeight * 0.02),
+                      ),
                       child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Agregar tarea',
+                            _selectedDayFormat.format(_selectedDate),
                             style: TextStyle(
-                              fontSize: fontSize,
+                              fontSize: largeFontSize,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          SizedBox(width: screenWidth * 0.02),
-                          FloatingActionButton(
-                            backgroundColor: const Color(0xFF0047AB),
-                            onPressed: _showAddTaskDialog,
-                            child: const Icon(Icons.add, color: Colors.white),
+                          IconButton(
+                            icon: Icon(Icons.edit, size: fontSize * 1.2),
+                            onPressed: () async {
+                              // Mostrar selector de fecha
+                              final pickedDate = await showDatePicker(
+                                context: context,
+                                initialDate: _selectedDate,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime(2030),
+                              );
+
+                              if (pickedDate != null) {
+                                _onDateSelected(pickedDate);
+
+                                // Actualizar el mes actual si es necesario
+                                if (pickedDate.month != _currentMonth.month ||
+                                    pickedDate.year != _currentMonth.year) {
+                                  setState(() {
+                                    _currentMonth = DateTime(
+                                      pickedDate.year,
+                                      pickedDate.month,
+                                      1,
+                                    );
+                                  });
+                                  _loadDatesWithTasks();
+                                }
+                              }
+                            },
                           ),
                         ],
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
 
-            SizedBox(height: screenHeight * 0.02),
-
-            // Sección de tareas para el día seleccionado
-            Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFCCF9F9), // Color de fondo (azul muy claro)
-                borderRadius: BorderRadius.circular(fontSize),
-                border: Border.all(color: Colors.grey.withOpacity(0.3)),
-              ),
-              child: Column(
-                children: [
-                  // Encabezado de tareas
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      vertical: screenHeight * 0.015,
-                      horizontal: screenWidth * 0.04,
-                    ),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF4A90E2), // Azul
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(8),
-                        topRight: Radius.circular(8),
+                    // Selector de mes con navegación
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        vertical: screenHeight * 0.015,
                       ),
-                    ),
-                    width: double.infinity,
-                    child: Text(
-                      'Tareas para el día (${_dayFormat.format(_selectedDate)})',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: fontSize,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                  ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Dropdown para seleccionar mes/año
+                          GestureDetector(
+                            onTap: () async {
+                              // Mostrar selector de fecha para el mes
+                              final pickedDate = await showDatePicker(
+                                context: context,
+                                initialDate: _currentMonth,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime(2030),
+                                initialDatePickerMode: DatePickerMode.year,
+                              );
 
-                  // Lista de tareas
-                  Container(
-                    padding: EdgeInsets.all(screenWidth * 0.04),
-                    child: _tasks.isEmpty
-                        ? Center(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(
-                                vertical: screenHeight * 0.03,
-                              ),
-                              child: Text(
-                                'No hay tareas para este día',
-                                style: TextStyle(
-                                  fontSize: fontSize,
-                                  fontStyle: FontStyle.italic,
+                              if (pickedDate != null) {
+                                setState(() {
+                                  _currentMonth = DateTime(
+                                    pickedDate.year,
+                                    pickedDate.month,
+                                    1,
+                                  );
+                                });
+                                _loadDatesWithTasks();
+                              }
+                            },
+                            child: Row(
+                              children: [
+                                Text(
+                                  _monthYearFormat.format(_currentMonth),
+                                  style: TextStyle(
+                                    fontSize: fontSize,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
+                                Icon(
+                                  Icons.arrow_drop_down,
+                                  size: fontSize * 1.5,
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Botones de navegación
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  Icons.chevron_left,
+                                  size: fontSize * 1.5,
+                                ),
+                                onPressed: _previousMonth,
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  Icons.chevron_right,
+                                  size: fontSize * 1.5,
+                                ),
+                                onPressed: _nextMonth,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Calendario
+                    _buildCalendarGrid(fontSize),
+
+                    // Botón para agregar tarea
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Padding(
+                        padding: EdgeInsets.only(top: screenHeight * 0.02),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Agregar tarea',
+                              style: TextStyle(
+                                fontSize: fontSize,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                          )
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              ..._tasks.map(
-                                (task) => Padding(
-                                  padding: EdgeInsets.only(
-                                    bottom: screenHeight * 0.01,
+                            SizedBox(width: screenWidth * 0.02),
+                            FloatingActionButton(
+                              backgroundColor: const Color(0xFF0047AB),
+                              onPressed: () => _navigateToTaskForm(),
+                              child: const Icon(Icons.add, color: Colors.white),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              SizedBox(height: screenHeight * 0.02),
+
+              // Sección de tareas para el día seleccionado
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(
+                    0xFFCCF9F9,
+                  ), // Color de fondo (azul muy claro)
+                  borderRadius: BorderRadius.circular(fontSize),
+                  border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                ),
+                child: Column(
+                  children: [
+                    // Encabezado de tareas
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        vertical: screenHeight * 0.015,
+                        horizontal: screenWidth * 0.04,
+                      ),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF4A90E2), // Azul
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(8),
+                          topRight: Radius.circular(8),
+                        ),
+                      ),
+                      width: double.infinity,
+                      child: Text(
+                        'Tareas para el día (${_dayFormat.format(_selectedDate)})',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: fontSize,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+
+                    // Lista de tareas
+                    Container(
+                      padding: EdgeInsets.all(screenWidth * 0.04),
+                      constraints: BoxConstraints(
+                        minHeight: screenHeight * 0.2,
+                      ),
+                      child:
+                          _isLoading
+                              ? const Center(child: CircularProgressIndicator())
+                              : _tasks.isEmpty
+                              ? Center(
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: screenHeight * 0.03,
                                   ),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '• ',
-                                        style: TextStyle(
-                                          fontSize: fontSize,
-                                          fontWeight: FontWeight.bold,
+                                  child: Text(
+                                    'No hay tareas para este día',
+                                    style: TextStyle(
+                                      fontSize: fontSize,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                ),
+                              )
+                              : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ..._tasks.map(
+                                    (task) => Dismissible(
+                                      key: Key(task.id),
+                                      background: Container(
+                                        color: Colors.red,
+                                        alignment: Alignment.centerRight,
+                                        padding: const EdgeInsets.only(
+                                          right: 20,
+                                        ),
+                                        child: const Icon(
+                                          Icons.delete,
+                                          color: Colors.white,
                                         ),
                                       ),
-                                      SizedBox(width: screenWidth * 0.02),
-                                      Expanded(
-                                        child: Text(
-                                          task,
-                                          style: TextStyle(
-                                            fontSize: fontSize,
-                                            letterSpacing: 1.5,
+                                      direction: DismissDirection.endToStart,
+                                      onDismissed: (direction) {
+                                        _deleteTask(task);
+                                      },
+                                      child: Padding(
+                                        padding: EdgeInsets.only(
+                                          bottom: screenHeight * 0.01,
+                                        ),
+                                        child: ListTile(
+                                          contentPadding: EdgeInsets.zero,
+                                          leading: GestureDetector(
+                                            onTap:
+                                                () =>
+                                                    _toggleTaskCompletion(task),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(2),
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color:
+                                                    task.isCompleted
+                                                        ? _getPriorityColor(
+                                                          task.priority,
+                                                        )
+                                                        : Colors.transparent,
+                                                border: Border.all(
+                                                  color:
+                                                      task.isCompleted
+                                                          ? _getPriorityColor(
+                                                            task.priority,
+                                                          )
+                                                          : Colors.grey,
+                                                  width: 2,
+                                                ),
+                                              ),
+                                              child:
+                                                  task.isCompleted
+                                                      ? Icon(
+                                                        Icons.check,
+                                                        size: fontSize,
+                                                        color: Colors.white,
+                                                      )
+                                                      : const SizedBox(
+                                                        width: 20,
+                                                        height: 20,
+                                                      ),
+                                            ),
+                                          ),
+                                          title: Text(
+                                            task.title,
+                                            style: TextStyle(
+                                              fontSize: fontSize,
+                                              fontWeight: FontWeight.w500,
+                                              decoration:
+                                                  task.isCompleted
+                                                      ? TextDecoration
+                                                          .lineThrough
+                                                      : null,
+                                              color:
+                                                  task.isCompleted
+                                                      ? Colors.grey
+                                                      : Colors.black,
+                                            ),
+                                          ),
+                                          subtitle: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              if (task
+                                                  .description
+                                                  .isNotEmpty) ...[
+                                                Text(
+                                                  task.description,
+                                                  style: TextStyle(
+                                                    fontSize: smallFontSize,
+                                                    color: Colors.grey[700],
+                                                    decoration:
+                                                        task.isCompleted
+                                                            ? TextDecoration
+                                                                .lineThrough
+                                                            : null,
+                                                  ),
+                                                  maxLines: 2,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(height: 4),
+                                              ],
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.access_time,
+                                                    size: smallFontSize,
+                                                    color: Colors.grey[600],
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    DateFormat(
+                                                      'HH:mm',
+                                                    ).format(task.date),
+                                                    style: TextStyle(
+                                                      fontSize: smallFontSize,
+                                                      color: Colors.grey[600],
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Container(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 6,
+                                                          vertical: 2,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color: _getPriorityColor(
+                                                        task.priority,
+                                                      ).withOpacity(0.2),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            4,
+                                                          ),
+                                                    ),
+                                                    child: Text(
+                                                      _getPriorityText(
+                                                        task.priority,
+                                                      ),
+                                                      style: TextStyle(
+                                                        fontSize:
+                                                            smallFontSize * 0.9,
+                                                        color:
+                                                            _getPriorityColor(
+                                                              task.priority,
+                                                            ),
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                          trailing: IconButton(
+                                            icon: const Icon(Icons.edit),
+                                            onPressed:
+                                                () => _navigateToTaskForm(
+                                                  task: task,
+                                                ),
                                           ),
                                         ),
                                       ),
-                                    ],
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
-                              // Botón "Mostrar más"
-                              if (_tasks.length > 3)
-                                Center(
-                                  child: Padding(
-                                    padding: EdgeInsets.only(
-                                      top: screenHeight * 0.01,
-                                    ),
-                                    child: TextButton(
-                                      onPressed: () {
-                                        // Aquí iría la lógica para mostrar más tareas
-                                      },
-                                      child: Text(
-                                        'Mostrar más',
-                                        style: TextStyle(
-                                          fontSize: fontSize,
-                                          color: Colors.blue[800],
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  // Obtener el color según la prioridad
+  Color _getPriorityColor(int priority) {
+    switch (priority) {
+      case 1:
+        return Colors.green;
+      case 3:
+        return Colors.red;
+      default:
+        return Colors.orange;
+    }
+  }
+
+  // Obtener el texto según la prioridad
+  String _getPriorityText(int priority) {
+    switch (priority) {
+      case 1:
+        return 'Baja';
+      case 3:
+        return 'Alta';
+      default:
+        return 'Media';
+    }
   }
 
   // Construye la cuadrícula del calendario
@@ -380,28 +650,29 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final numRows = ((firstWeekday + daysInMonth) / 7).ceil();
 
     // Días de la semana
-    final daysOfWeek = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    final daysOfWeek = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
 
     return Column(
       children: [
         // Encabezados de días de la semana
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: daysOfWeek
-              .map(
-                (day) => SizedBox(
-                  width: fontSize * 2,
-                  child: Text(
-                    day,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: fontSize,
-                      fontWeight: FontWeight.bold,
+          children:
+              daysOfWeek
+                  .map(
+                    (day) => SizedBox(
+                      width: fontSize * 2,
+                      child: Text(
+                        day,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: fontSize,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              )
-              .toList(),
+                  )
+                  .toList(),
         ),
 
         SizedBox(height: fontSize * 0.8),
@@ -430,8 +701,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 );
 
                 // Verificamos si este día tiene tareas
-                final dateKey = DateFormat('yyyy-MM-dd').format(date);
-                final hasTasks = _tasksByDate.containsKey(dateKey);
+                final hasTask = _datesWithTasks.any(
+                  (taskDate) =>
+                      taskDate.year == date.year &&
+                      taskDate.month == date.month &&
+                      taskDate.day == date.day,
+                );
 
                 // Verificamos si es el día seleccionado
                 final isSelected =
@@ -451,15 +726,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     width: fontSize * 2.5,
                     height: fontSize * 2.5,
                     decoration: BoxDecoration(
-                      color: isSelected
-                          ? const Color(0xFF00CED1) // Color turquesa para el día seleccionado
-                          : Colors.transparent,
-                      border: hasTasks && !isSelected
-                          ? Border.all(
-                              color: const Color(0xFF00CED1),
-                              width: 1,
-                            )
-                          : null,
+                      color:
+                          isSelected
+                              ? const Color(
+                                0xFF00CED1,
+                              ) // Color turquesa para el día seleccionado
+                              : Colors.transparent,
+                      border:
+                          hasTask && !isSelected
+                              ? Border.all(
+                                color: const Color(0xFF00CED1),
+                                width: 1,
+                              )
+                              : null,
                       shape: BoxShape.circle,
                     ),
                     alignment: Alignment.center,
@@ -467,9 +746,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       day.toString(),
                       style: TextStyle(
                         fontSize: fontSize * 0.9,
-                        fontWeight: isSelected || isToday
-                            ? FontWeight.bold
-                            : FontWeight.normal,
+                        fontWeight:
+                            isSelected || isToday
+                                ? FontWeight.bold
+                                : FontWeight.normal,
                         color: isSelected ? Colors.white : Colors.black,
                       ),
                     ),
