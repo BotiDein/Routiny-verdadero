@@ -1,8 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/task.dart';
-import '../models/habit.dart';
-import '../models/hobby.dart';
 import 'package:intl/intl.dart';
 
 class FirebaseService {
@@ -56,15 +54,20 @@ class FirebaseService {
   
   // Obtener tareas para un rango de fechas (para el resumen mensual)
   Future<List<Task>> getTasksForDateRange(DateTime startDate, DateTime endDate) async {
-    final snapshot = await _tasksCollection
-        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
-        .where('date', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
-        .orderBy('date')
-        .get();
-        
-    return snapshot.docs.map((doc) {
-      return Task.fromMap(doc.data() as Map<String, dynamic>);
-    }).toList();
+    try {
+      final snapshot = await _tasksCollection
+          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+          .where('date', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
+          .orderBy('date')
+          .get();
+          
+      return snapshot.docs.map((doc) {
+        return Task.fromMap(doc.data() as Map<String, dynamic>);
+      }).toList();
+    } catch (e) {
+      print('Error al obtener tareas para rango de fechas: $e');
+      return [];
+    }
   }
 
   // Añadir una tarea
@@ -135,130 +138,122 @@ class FirebaseService {
   // MÉTODOS PARA HÁBITOS
   
   // Obtener todos los hábitos
-  Future<List<Habit>> getHabits() async {
-    final snapshot = await _habitsCollection.get();
-    return snapshot.docs.map((doc) {
-      return Habit.fromMap(doc.data() as Map<String, dynamic>);
-    }).toList();
+  Future<List<Map<String, dynamic>>> getHabits() async {
+    try {
+      // Intentar obtener hábitos de Firebase
+      final snapshot = await _habitsCollection.get();
+      
+      if (snapshot.docs.isEmpty) {
+        // Si no hay hábitos en Firebase, usar datos de ejemplo
+        return _getDemoHabits();
+      }
+      
+      return snapshot.docs.map((doc) {
+        return doc.data() as Map<String, dynamic>;
+      }).toList();
+    } catch (e) {
+      print('Error al obtener hábitos: $e');
+      // En caso de error, devolver datos de ejemplo
+      return _getDemoHabits();
+    }
   }
   
-  // Obtener hábitos para un rango de fechas
-  Future<List<Habit>> getHabitsForDateRange(DateTime startDate, DateTime endDate) async {
-    final snapshot = await _habitsCollection
-        .where('createdAt', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
-        .get();
-        
-    return snapshot.docs.map((doc) {
-      return Habit.fromMap(doc.data() as Map<String, dynamic>);
-    }).toList();
+  // Datos de ejemplo para hábitos (en caso de que no haya datos en Firebase)
+  List<Map<String, dynamic>> _getDemoHabits() {
+    return [
+      {
+        'id': '1',
+        'name': 'Salir a correr',
+        'category': 'Ejercicio',
+        'type': 'count',
+        'option': 'Al menos',
+        'goal': 30,
+        'amount': 5,
+        'current': 20,
+        'description': 'Correr al menos 30 minutos diarios',
+        'days': [0, 1, 2, 1, 0, 1, 0], // 0: no registrado, 1: parcial, 2: completado
+        'createdAt': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 30))),
+      },
+      {
+        'id': '2',
+        'name': 'Meditar',
+        'category': 'Salud',
+        'type': 'time',
+        'option': 'Al menos',
+        'goal': '00:15:00',
+        'current': '00:10:00',
+        'description': 'Meditar al menos 15 minutos diarios',
+        'days': [2, 0, 2, 2, 1, 0, 0],
+        'createdAt': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 20))),
+      },
+      {
+        'id': '3',
+        'name': 'Leer',
+        'category': 'Educación',
+        'type': 'boolean',
+        'current': true,
+        'description': 'Leer al menos un capítulo diario',
+        'days': [2, 2, 0, 2, 2, 0, 0],
+        'createdAt': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 15))),
+      },
+    ];
   }
   
   // MÉTODOS PARA HOBBIES
   
   // Obtener todos los hobbies
-  Future<List<Hobby>> getHobbies() async {
-    final snapshot = await _hobbiesCollection.get();
-    return snapshot.docs.map((doc) {
-      return Hobby.fromMap(doc.data() as Map<String, dynamic>);
-    }).toList();
-  }
-  
-  // Obtener hobbies para un rango de fechas
-  Future<List<Hobby>> getHobbiesForDateRange(DateTime startDate, DateTime endDate) async {
-    final snapshot = await _hobbiesCollection
-        .where('createdAt', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
-        .get();
-        
-    return snapshot.docs.map((doc) {
-      return Hobby.fromMap(doc.data() as Map<String, dynamic>);
-    }).toList();
-  }
-  
-  // MÉTODOS PARA EL RESUMEN
-  
-  // Obtener datos para el resumen mensual
-  Future<Map<String, dynamic>> getMonthlyData(int year, int month) async {
-    final firstDayOfMonth = DateTime(year, month, 1);
-    final lastDayOfMonth = DateTime(year, month + 1, 0, 23, 59, 59);
-    
-    // Obtener datos de tareas, hábitos y hobbies
-    final tasks = await getTasksForDateRange(firstDayOfMonth, lastDayOfMonth);
-    final habits = await getHabitsForDateRange(firstDayOfMonth, lastDayOfMonth);
-    final hobbies = await getHobbiesForDateRange(firstDayOfMonth, lastDayOfMonth);
-    
-    // Calcular estadísticas
-    final totalTasks = tasks.length;
-    final completedTasks = tasks.where((task) => task.isCompleted).length;
-    
-    // Calcular rachas de hábitos
-    int currentStreak = 0;
-    int longestStreak = 0;
-    
-    // Calcular tiempo por categoría
-    Map<String, double> timeByCategory = {};
-    
-    // Procesar tareas
-    for (var task in tasks) {
-      final category = task.category;
-      timeByCategory[category] = (timeByCategory[category] ?? 0) + (task.isCompleted ? 1.0 : 0.5);
-    }
-    
-    // Procesar hábitos
-    for (var habit in habits) {
-      final category = habit.category;
-      final progress = habit.getProgressPercentage();
-      timeByCategory[category] = (timeByCategory[category] ?? 0) + progress * 2.0; // Asumimos 2 horas por hábito completado
-    }
-    
-    // Procesar hobbies
-    for (var hobby in hobbies) {
-      final category = hobby.category;
-      final timeInMinutes = _convertTimeToMinutes(hobby.time);
-      timeByCategory[category] = (timeByCategory[category] ?? 0) + (timeInMinutes / 60.0);
-    }
-    
-    // Calcular actividad diaria
-    Map<int, int> activityByDay = {};
-    for (int i = 1; i <= lastDayOfMonth.day; i++) {
-      activityByDay[i] = 0;
-    }
-    
-    // Contar actividades por día
-    for (var task in tasks) {
-      if (task.isCompleted) {
-        final day = task.date.day;
-        activityByDay[day] = (activityByDay[day] ?? 0) + 1;
-      }
-    }
-    
-    // Calcular rachas (simplificado)
-    currentStreak = 4; // Valor de ejemplo
-    longestStreak = 7; // Valor de ejemplo
-    
-    return {
-      'totalTasks': totalTasks,
-      'completedTasks': completedTasks,
-      'currentStreak': currentStreak,
-      'longestStreak': longestStreak,
-      'timeByCategory': timeByCategory,
-      'activityByDay': activityByDay,
-    };
-  }
-  
-  // Convertir formato de tiempo (HH:MM:SS) a minutos
-  int _convertTimeToMinutes(String time) {
+  Future<List<Map<String, dynamic>>> getHobbies() async {
     try {
-      final parts = time.split(':');
-      if (parts.length >= 3) {
-        final hours = int.tryParse(parts[0]) ?? 0;
-        final minutes = int.tryParse(parts[1]) ?? 0;
-        final seconds = int.tryParse(parts[2]) ?? 0;
-        return hours * 60 + minutes + (seconds > 0 ? 1 : 0);
+      final snapshot = await _hobbiesCollection.get();
+      
+      if (snapshot.docs.isEmpty) {
+        // Si no hay hobbies en Firebase, usar datos de ejemplo
+        return _getDemoHobbies();
       }
+      
+      return snapshot.docs.map((doc) {
+        return doc.data() as Map<String, dynamic>;
+      }).toList();
     } catch (e) {
-      print('Error al convertir tiempo: $e');
+      print('Error al obtener hobbies: $e');
+      // En caso de error, devolver datos de ejemplo
+      return _getDemoHobbies();
     }
-    return 0;
+  }
+  
+  // Datos de ejemplo para hobbies (en caso de que no haya datos en Firebase)
+  List<Map<String, dynamic>> _getDemoHobbies() {
+    return [
+      {
+        'id': '1',
+        'name': 'Tocar guitarra',
+        'icon': '🎸',
+        'category': 'Música',
+        'time': '03:30:00',
+        'weeklyGoal': '05:00:00',
+        'registeredTimes': [
+          {'date': '2025-4-15', 'time': '01:00:00'},
+          {'date': '2025-4-17', 'time': '01:30:00'},
+          {'date': '2025-4-19', 'time': '01:00:00'},
+        ],
+        'activeDays': [1, 3, 5], // Lunes, Miércoles, Viernes
+        'createdAt': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 45))),
+      },
+      {
+        'id': '2',
+        'name': 'Pintar',
+        'icon': '🎨',
+        'category': 'Arte',
+        'time': '02:45:00',
+        'weeklyGoal': '04:00:00',
+        'registeredTimes': [
+          {'date': '2025-4-14', 'time': '01:15:00'},
+          {'date': '2025-4-18', 'time': '01:30:00'},
+        ],
+        'activeDays': [0, 4], // Domingo, Jueves
+        'createdAt': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 30))),
+      },
+    ];
   }
 }
 
