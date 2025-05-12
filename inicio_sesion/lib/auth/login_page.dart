@@ -83,6 +83,58 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  // Mostrar diálogo para recuperar contraseña
+  void mostrarDialogoRecuperacion() {
+    final TextEditingController correoRecuperacion = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Recuperar contraseña'),
+          content: TextField(
+            controller: correoRecuperacion,
+            decoration: const InputDecoration(
+              hintText: 'Ingresa tu correo',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final email = correoRecuperacion.text.trim();
+                if (email.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Por favor, escribe tu correo')),
+                  );
+                  return;
+                }
+
+                try {
+                  await FirebaseAuth.instance
+                      .sendPasswordResetEmail(email: email);
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Se ha enviado un correo para restablecer tu contraseña.')),
+                  );
+                } catch (e) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error al enviar correo: $e')),
+                  );
+                }
+              },
+              child: const Text('Enviar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -122,19 +174,18 @@ class _LoginPageState extends State<LoginPage> {
           child: SingleChildScrollView(
             child: Column(
               children: [
-                // Logo y título
-                SizedBox(height: screenHeight * 0.05), // Espacio superior
+                SizedBox(height: screenHeight * 0.05),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Image.asset(
                       'assets/logo.png',
-                      width: 170,  // Tamaño fijo 
-                      height: 170,  // Tamaño fijo 
+                      width: 170,
+                      height: 170,
                       errorBuilder: (context, error, stackTrace) {
                         return Icon(
                           Icons.image_not_supported,
-                          size: 217,  // Tamaño de la imagen en caso de error
+                          size: 217,
                           color: Colors.grey,
                         );
                       },
@@ -152,7 +203,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 SizedBox(height: screenHeight * 0.03),
 
-                // Campo de texto para el correo
+                // Usuario
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
@@ -178,7 +229,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 SizedBox(height: screenHeight * 0.025),
 
-                // Campo de texto para la contraseña
+                // Contraseña
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
@@ -203,9 +254,25 @@ class _LoginPageState extends State<LoginPage> {
                     contentPadding: inputPadding,
                   ),
                 ),
-                SizedBox(height: screenHeight * 0.06),
 
-                // Botón de inicio de sesión
+                // Enlace "¿Has olvidado tu contraseña?"
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: mostrarDialogoRecuperacion,
+                    child: Text(
+                      '¿Has olvidado tu contraseña?',
+                      style: TextStyle(
+                        fontSize: labelFontSize * 0.95,
+                        color: Colors.blue[800],
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(height: screenHeight * 0.03),
+
+                // Botón iniciar sesión
                 SizedBox(
                   width: buttonWidth,
                   height: buttonHeight,
@@ -226,48 +293,47 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 SizedBox(height: screenHeight * 0.03),
 
-                // Botón de Google
-// Botón de Google con texto y la imagen al lado izquierdo
-SizedBox(
-  width: buttonWidth*1.25,  height: buttonHeight,
-  child: ElevatedButton(
-    style: ElevatedButton.styleFrom(
-      backgroundColor: Colors.white,
-      foregroundColor: Colors.black,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(screenWidth * 0.02),
-      ),
-      side: BorderSide(color: Colors.grey, width: 1), // Borde gris opcional
-    ),
-    onPressed: isLoading ? null : loginWithGoogle,
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Image.asset(
-          'assets/google_logo.png',
-          height: screenHeight * 0.04,
-          errorBuilder: (context, error, stackTrace) {
-            return Icon(
-              Icons.g_mobiledata,
-              size: screenHeight * 0.04,
-            );
-          },
-        ),
-        SizedBox(width: screenWidth * 0.02), // Espacio entre el icono y el texto
-        Text(
-          'Iniciar sesión con Google',
-          style: TextStyle(
-            fontSize: buttonFontSize,
-            color: Colors.black,
-          ),
-        ),
-      ],
-    ),
-  ),
-),
+                // Botón Google
+                SizedBox(
+                  width: buttonWidth * 1.25,
+                  height: buttonHeight,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(screenWidth * 0.02),
+                      ),
+                      side: const BorderSide(color: Colors.grey, width: 1),
+                    ),
+                    onPressed: isLoading ? null : loginWithGoogle,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Image.asset(
+                          'assets/google_logo.png',
+                          height: screenHeight * 0.04,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Icon(
+                              Icons.g_mobiledata,
+                              size: screenHeight * 0.04,
+                            );
+                          },
+                        ),
+                        SizedBox(width: screenWidth * 0.02),
+                        Text(
+                          'Iniciar sesión con Google',
+                          style: TextStyle(
+                            fontSize: buttonFontSize,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
 
-
-                // Mostrar errores
+                // Errores
                 if (error.isNotEmpty)
                   Padding(
                     padding: EdgeInsets.only(top: screenHeight * 0.02),
@@ -281,7 +347,7 @@ SizedBox(
                   ),
                 SizedBox(height: screenHeight * 0.025),
 
-                // Enlace para crear cuenta
+                // Enlace registrar
                 TextButton(
                   onPressed: () => Navigator.pushReplacement(
                     context,

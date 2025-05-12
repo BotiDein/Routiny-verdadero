@@ -1,19 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../auth/landing_page.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  late double screenWidth;
+  late double screenHeight;
+  late ScaffoldMessengerState _messenger;
+
+  double scaleWidth(double value) => value * screenWidth / 720;
+  double scaleHeight(double value) => value * screenHeight / 1280;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     final mediaQuery = MediaQuery.of(context);
-    final screenWidth = mediaQuery.size.width;
-    final screenHeight = mediaQuery.size.height;
+    screenWidth = mediaQuery.size.width;
+    screenHeight = mediaQuery.size.height;
+    _messenger = ScaffoldMessenger.of(context);
+  }
 
-    double scaleWidth(double value) => value * screenWidth / 720;
-    double scaleHeight(double value) => value * screenHeight / 1280;
-
+  @override
+  Widget build(BuildContext context) {
     final titleFontSize = screenWidth * 0.06;
     final optionFontSize = screenWidth * 0.045;
     final iconSize = screenWidth * 0.06;
@@ -43,7 +58,12 @@ class SettingsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildConfigItem(Icons.person, 'Mi cuenta', optionFontSize, () {}),
+            _buildConfigItem(
+              Icons.person,
+              'Mi cuenta',
+              optionFontSize,
+              () => _showAccountDialog(context),
+            ),
             SizedBox(height: scaleHeight(20)),
             _buildConfigItem(
               Icons.chat_bubble_outline,
@@ -97,14 +117,15 @@ class SettingsScreen extends StatelessWidget {
       title: 'Cerrar sesión',
       message: '¿Estás seguro de que quieres seguir?',
       onConfirm: () async {
-        Navigator.of(context).pop(); // Cierra el diálogo primero
+        Navigator.of(context).pop();
         await FirebaseAuth.instance.signOut();
-
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const LandingPage()),
-          (_) => false,
-        );
+        if (mounted) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const LandingPage()),
+            (_) => false,
+          );
+        }
       },
     );
   }
@@ -141,8 +162,10 @@ class SettingsScreen extends StatelessWidget {
           ),
           content: const SingleChildScrollView(
             child: Text(
-              'Lorem ipsum dolor sit amet, consectetur adipiscing elit. '
-              'Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+              'ROUTINY es una app móvil para organizar tu rutina y mejorar tu bienestar personal, académico y emocional. '
+              'Diseñada para estudiantes, freelancers y cualquier persona que quiera gestionar mejor su tiempo.\n\n'
+              'Incluye herramientas para seguir hábitos saludables, organizar tareas académicas, registrar hobbies y ver resúmenes de tu progreso. '
+              'Todo esto en una interfaz sencilla, sin funciones comerciales, y con protección de tus datos.',
               style: TextStyle(fontFamily: 'Roboto'),
             ),
           ),
@@ -156,6 +179,7 @@ class SettingsScreen extends StatelessWidget {
       },
     );
   }
+
 
   void _showSuggestionDialog(BuildContext context) {
     final TextEditingController suggestionController = TextEditingController();
@@ -198,19 +222,123 @@ class SettingsScreen extends StatelessWidget {
               child: const Text('Cerrar'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 final suggestion = suggestionController.text.trim();
                 if (suggestion.isNotEmpty) {
                   Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('¡Gracias por tu sugerencia!')),
-                  );
-                  // Aquí podrías guardar en Firestore si lo deseas.
+                  
+                  final user = FirebaseAuth.instance.currentUser;
+                  final uid = user?.uid ?? 'anónimo';
+                  final email = user?.email ?? 'anónimo';
+                  
+                  // Guardar la sugerencia en Firestore
+                  await FirebaseFirestore.instance.collection('sugerencias').add({
+                    'texto': suggestion,
+                    'uid': uid,
+                    'email': email,
+                    'fecha': FieldValue.serverTimestamp(),
+                  });
+
+                  if (mounted) {
+                    _messenger.showSnackBar(
+                      const SnackBar(content: Text('¡Gracias por tu sugerencia!')),
+                    );
+                  }
                 }
               },
               child: const Text('Enviar'),
             ),
           ],
+        );
+      },
+    );
+  }
+
+  void _showAccountDialog(BuildContext context) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    final userData = userDoc.data();
+
+    final name = userData?['name'] ?? 'Desconocido';
+    final email = user.email ?? 'Sin correo';
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          titlePadding: const EdgeInsets.all(0),
+          contentPadding: const EdgeInsets.all(24),
+          backgroundColor: const Color(0xFFE0FFFF),
+          title: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              color: Color(0xFF4A90E2),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.black),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Mi cuenta',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                    fontSize: 20,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Mi nombre', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text(name),
+              const Divider(),
+              const SizedBox(height: 8),
+              const Text('Mi correo electrónico', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text(email),
+              const Divider(),
+              const SizedBox(height: 20),
+              Center(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF005BBB),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  ),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    try {
+                      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+                      if (mounted) {
+                        _messenger.showSnackBar(
+                          const SnackBar(content: Text('Se ha enviado un correo para restablecer tu contraseña')),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        _messenger.showSnackBar(
+                          SnackBar(content: Text('Error al enviar el correo: $e')),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text('Cambiar contraseña'),
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
