@@ -1,50 +1,74 @@
-import 'package:flutter/material.dart';
-import '../models/task.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-class TaskList extends StatelessWidget {
-  final List<Task> tasks;
-  
-  const TaskList({
-    super.key,
-    required this.tasks,
+class Task {
+  final String id;
+  final String title;
+  final String description;
+  final DateTime date;
+  final DateTime createdAt;
+  final String category;
+  final bool isCompleted;
+  final int priority; // 1: baja, 2: media, 3: alta
+
+  Task({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.date,
+    required this.createdAt,
+    this.category = 'General',
+    this.isCompleted = false,
+    this.priority = 2,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final fontSize = screenWidth * 0.035;
-    
-    return ListView.builder(
-      padding: EdgeInsets.all(screenWidth * 0.02),
-      itemCount: tasks.length,
-      itemBuilder: (context, index) {
-        final task = tasks[index];
-        return Padding(
-          padding: EdgeInsets.symmetric(vertical: screenWidth * 0.01),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '•',
-                style: TextStyle(
-                  fontSize: fontSize * 1.5,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(width: screenWidth * 0.02),
-              Expanded(
-                child: Text(
-                  task.title,
-                  style: TextStyle(
-                    fontSize: fontSize,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+  // Convertir a Map para Firebase
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'title': title,
+      'description': description,
+      'date': Timestamp.fromDate(date),
+      'createdAt': Timestamp.fromDate(createdAt),
+      'category': category,
+      'isCompleted': isCompleted,
+      'priority': priority,
+    };
+  }
+
+  // Crear desde Map de Firebase
+  factory Task.fromMap(Map<String, dynamic> map) {
+    return Task(
+      id: map['id'] ?? '',
+      title: map['title'] ?? '',
+      description: map['description'] ?? '',
+      date: (map['date'] as Timestamp).toDate(),
+      createdAt: (map['createdAt'] as Timestamp).toDate(),
+      category: map['category'] ?? 'General',
+      isCompleted: map['isCompleted'] ?? false,
+      priority: map['priority'] ?? 2,
+    );
+  }
+
+  // Crear copia con cambios
+  Task copyWith({
+    String? id,
+    String? title,
+    String? description,
+    DateTime? date,
+    DateTime? createdAt,
+    String? category,
+    bool? isCompleted,
+    int? priority,
+  }) {
+    return Task(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      date: date ?? this.date,
+      createdAt: createdAt ?? this.createdAt,
+      category: category ?? this.category,
+      isCompleted: isCompleted ?? this.isCompleted,
+      priority: priority ?? this.priority,
     );
   }
 }

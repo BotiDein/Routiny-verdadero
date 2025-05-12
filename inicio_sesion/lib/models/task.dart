@@ -1,66 +1,74 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class Task {
   final String id;
   final String title;
-  final String? description;
+  final String description;
   final DateTime date;
-  final bool isCompleted;
-  final String? category;
   final DateTime createdAt;
+  final String category;
+  final bool isCompleted;
+  final int priority; // 1: baja, 2: media, 3: alta
 
   Task({
     required this.id,
     required this.title,
-    this.description,
+    required this.description,
     required this.date,
-    this.isCompleted = false,
-    this.category,
     required this.createdAt,
+    this.category = 'General',
+    this.isCompleted = false,
+    this.priority = 2,
   });
 
-  // Crear una copia de la tarea con algunos campos modificados
+  // Convertir a Map para Firebase
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'title': title,
+      'description': description,
+      'date': Timestamp.fromDate(date),
+      'createdAt': Timestamp.fromDate(createdAt),
+      'category': category,
+      'isCompleted': isCompleted,
+      'priority': priority,
+    };
+  }
+
+  // Crear desde Map de Firebase
+  factory Task.fromMap(Map<String, dynamic> map) {
+    return Task(
+      id: map['id'] ?? '',
+      title: map['title'] ?? '',
+      description: map['description'] ?? '',
+      date: (map['date'] as Timestamp).toDate(),
+      createdAt: (map['createdAt'] as Timestamp).toDate(),
+      category: map['category'] ?? 'General',
+      isCompleted: map['isCompleted'] ?? false,
+      priority: map['priority'] ?? 2,
+    );
+  }
+
+  // Crear copia con cambios
   Task copyWith({
     String? id,
     String? title,
     String? description,
     DateTime? date,
-    bool? isCompleted,
-    String? category,
     DateTime? createdAt,
+    String? category,
+    bool? isCompleted,
+    int? priority,
   }) {
     return Task(
       id: id ?? this.id,
       title: title ?? this.title,
       description: description ?? this.description,
       date: date ?? this.date,
-      isCompleted: isCompleted ?? this.isCompleted,
-      category: category ?? this.category,
       createdAt: createdAt ?? this.createdAt,
-    );
-  }
-
-  // Convertir la tarea a un mapa para almacenamiento
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'title': title,
-      'description': description,
-      'date': date.millisecondsSinceEpoch,
-      'isCompleted': isCompleted,
-      'category': category,
-      'createdAt': createdAt.millisecondsSinceEpoch,
-    };
-  }
-
-  // Crear una tarea desde un mapa
-  factory Task.fromMap(Map<String, dynamic> map) {
-    return Task(
-      id: map['id'],
-      title: map['title'],
-      description: map['description'],
-      date: DateTime.fromMillisecondsSinceEpoch(map['date']),
-      isCompleted: map['isCompleted'] ?? false,
-      category: map['category'],
-      createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt']),
+      category: category ?? this.category,
+      isCompleted: isCompleted ?? this.isCompleted,
+      priority: priority ?? this.priority,
     );
   }
 }
