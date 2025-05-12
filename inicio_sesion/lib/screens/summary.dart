@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'home_screen.dart'; // ahora menu.dart se llama home_screen.dart
 
 class ResumenPersonalScreen extends StatelessWidget {
   const ResumenPersonalScreen({super.key});
