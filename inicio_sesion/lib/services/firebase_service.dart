@@ -114,7 +114,7 @@ class FirebaseService {
       final date = (data['date'] as Timestamp).toDate();
       final dateString = '${date.year}-${date.month}-${date.day}';
       uniqueDates.add(dateString);
-      print('Tarea para fecha: ${dateString}');
+      print('Tarea para fecha: $dateString');
     }
 
     // Convertir a lista de DateTime

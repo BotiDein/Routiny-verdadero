@@ -3,7 +3,6 @@ import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/firebase_service.dart';
 import '../models/task.dart';
-import '../models/habit.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:math' as math;
 
