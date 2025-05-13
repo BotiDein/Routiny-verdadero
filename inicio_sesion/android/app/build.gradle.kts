@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.my_new_app"
+    namespace = "com.example.inicio_sesion"
     compileSdk = 35
     ndkVersion = "27.0.12077973"
 
@@ -19,7 +19,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.my_new_app"
+        applicationId = "com.example.inicio_sesion"
         minSdk = 23
         targetSdk = 34
         versionCode = 1
