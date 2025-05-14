@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/task.dart';
-import 'package:intl/intl.dart';
 
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -114,7 +113,7 @@ class FirebaseService {
       final date = (data['date'] as Timestamp).toDate();
       final dateString = '${date.year}-${date.month}-${date.day}';
       uniqueDates.add(dateString);
-      print('Tarea para fecha: ${dateString}');
+      print('Tarea para fecha: $dateString');
     }
 
     // Convertir a lista de DateTime
