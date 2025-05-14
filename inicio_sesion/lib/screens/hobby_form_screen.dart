@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/hobby.dart';
 
 class HobbyFormScreen extends StatefulWidget {
   final Map<String, dynamic>? hobby;
@@ -183,15 +184,24 @@ class _HobbyFormScreenState extends State<HobbyFormScreen> {
                       final hours = _weeklyGoalController.text.isNotEmpty 
                           ? _weeklyGoalController.text.padLeft(2, '0')
                           : '05';
-                          
-                      Navigator.pop(context, {
+                      
+                      final Map<String, dynamic> hobbyData = {
+                        'id': widget.isEditing && widget.hobby != null && widget.hobby!.containsKey('id') 
+                            ? widget.hobby!['id'] 
+                            : DateTime.now().millisecondsSinceEpoch.toString(),
                         'name': _nameController.text,
                         'icon': _selectedEmoji,
                         'time': '00:00:00',
                         'weeklyGoal': '$hours:00:00',
-                        'registeredTimes': [], // Inicializar como lista vacía
-                        'activeDays': [], // Inicializar como lista vacía
-                      });
+                        'registeredTimes': widget.isEditing && widget.hobby != null && widget.hobby!.containsKey('registeredTimes')
+                            ? widget.hobby!['registeredTimes']
+                            : [],
+                        'activeDays': widget.isEditing && widget.hobby != null && widget.hobby!.containsKey('activeDays')
+                            ? widget.hobby!['activeDays']
+                            : [],
+                      };
+                          
+                      Navigator.pop(context, hobbyData);
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(

@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../models/hobby.dart';
+import '../services/local_storage_service.dart';
 import 'hobby_form_screen.dart';
 
 class HobbyDetailScreen extends StatefulWidget {
-  final Map<String, dynamic> hobby;
+  final Hobby hobby;
 
   const HobbyDetailScreen({super.key, required this.hobby});
 
@@ -13,44 +15,26 @@ class HobbyDetailScreen extends StatefulWidget {
 }
 
 class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
+  final LocalStorageService _storageService = LocalStorageService();
   String _totalTime = '00:00:00';
   String _weeklyGoal = '05:00:00';
   bool _goalCompleted = false;
   bool _goalExceeded = false;
 
-  // Lista de tiempos registrados - inicializada como vacía
+  // Lista de tiempos registrados
   List<Map<String, dynamic>> _registeredTimes = [];
 
   // Días con actividad (0 = domingo, 6 = sábado)
-  final List<int> _activeDays = []; // Inicializada como vacía
+  List<int> _activeDays = []; // Inicializada como vacía
 
   @override
   void initState() {
     super.initState();
     // Inicializar con los datos del hobby
-    if (widget.hobby.containsKey('weeklyGoal')) {
-      _weeklyGoal = widget.hobby['weeklyGoal'];
-    }
-    
-    // Inicializar tiempos registrados si existen en el hobby
-    if (widget.hobby.containsKey('registeredTimes') && 
-        widget.hobby['registeredTimes'] is List) {
-      _registeredTimes = List<Map<String, dynamic>>.from(widget.hobby['registeredTimes']);
-    } else {
-      // Si no existen, inicializar como una lista vacía y guardarla en el hobby
-      _registeredTimes = [];
-      widget.hobby['registeredTimes'] = _registeredTimes;
-    }
-    
-    // Inicializar días activos si existen en el hobby
-    if (widget.hobby.containsKey('activeDays') && 
-        widget.hobby['activeDays'] is List) {
-      _activeDays.clear();
-      _activeDays.addAll(List<int>.from(widget.hobby['activeDays']));
-    } else {
-      // Si no existen, guardar la lista vacía en el hobby
-      widget.hobby['activeDays'] = _activeDays;
-    }
+    _weeklyGoal = widget.hobby.weeklyGoal;
+    _registeredTimes = widget.hobby.registeredTimes;
+    _activeDays = widget.hobby.activeDays;
+    _totalTime = widget.hobby.time;
     
     _calculateTotalTime();
     _checkGoalCompletion();
@@ -79,20 +63,20 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
               'date': DateTime.now(),
               'time': formattedTime,
             });
-            // Actualizar la lista en el hobby
-            widget.hobby['registeredTimes'] = _registeredTimes;
             
             // Actualizar días activos
             final today = DateTime.now().weekday % 7;
             if (!_activeDays.contains(today)) {
               _activeDays.add(today);
-              widget.hobby['activeDays'] = _activeDays;
             }
             
             // Actualizar tiempo total
             _calculateTotalTime();
             // Verificar si se cumplió la meta
             _checkGoalCompletion();
+            
+            // Actualizar el hobby y guardarlo
+            _updateAndSaveHobby();
           });
         }
       }
@@ -246,20 +230,20 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
                     'date': DateTime.now(),
                     'time': newTime,
                   });
-                  // Actualizar la lista en el hobby
-                  widget.hobby['registeredTimes'] = _registeredTimes;
                   
                   // Actualizar días activos
                   final today = DateTime.now().weekday % 7;
                   if (!_activeDays.contains(today)) {
                     _activeDays.add(today);
-                    widget.hobby['activeDays'] = _activeDays;
                   }
                   
                   // Actualizar tiempo total
                   _calculateTotalTime();
                   // Verificar si se cumplió la meta
                   _checkGoalCompletion();
+                  
+                  // Actualizar el hobby y guardarlo
+                  _updateAndSaveHobby();
                 });
                 Navigator.of(context).pop();
               },
@@ -269,6 +253,21 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
         );
       },
     );
+  }
+
+  // Actualizar el hobby y guardarlo
+  void _updateAndSaveHobby() {
+    final updatedHobby = Hobby(
+      id: widget.hobby.id,
+      name: widget.hobby.name,
+      icon: widget.hobby.icon,
+      time: _totalTime,
+      weeklyGoal: _weeklyGoal,
+      registeredTimes: _registeredTimes,
+      activeDays: _activeDays,
+    );
+    
+    _storageService.updateHobby(updatedHobby);
   }
 
   // Convertir tiempo en formato HH:MM:SS a segundos
@@ -301,8 +300,6 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
     
     setState(() {
       _totalTime = _secondsToTime(totalSeconds);
-      // Actualizar el tiempo en el hobby original para que se refleje en la lista
-      widget.hobby['time'] = _totalTime;
     });
   }
 
@@ -323,29 +320,85 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder:
-            (context) => HobbyFormScreen(hobby: widget.hobby, isEditing: true),
+        builder: (context) => HobbyFormScreen(
+          hobby: {
+            'id': widget.hobby.id,
+            'name': widget.hobby.name,
+            'icon': widget.hobby.icon,
+            'time': widget.hobby.time,
+            'weeklyGoal': widget.hobby.weeklyGoal,
+            'registeredTimes': widget.hobby.registeredTimes,
+            'activeDays': widget.hobby.activeDays,
+          },
+          isEditing: true,
+        ),
       ),
-    ).then((updatedHobby) {
-      if (updatedHobby != null) {
+    ).then((result) {
+      if (result != null && result is Map<String, dynamic>) {
         // Actualizar el hobby con los nuevos datos
         setState(() {
-          if (updatedHobby.containsKey('weeklyGoal')) {
-            _weeklyGoal = updatedHobby['weeklyGoal'];
-            // Actualizar el hobby original
-            widget.hobby['weeklyGoal'] = updatedHobby['weeklyGoal'];
-            widget.hobby['name'] = updatedHobby['name'];
-            widget.hobby['icon'] = updatedHobby['icon'];
-          }
+          _weeklyGoal = result['weeklyGoal'] ?? _weeklyGoal;
+          
           // Verificar si se cumplió la meta con el nuevo objetivo
           _checkGoalCompletion();
+          
+          // Actualizar el hobby y guardarlo
+          final updatedHobby = Hobby(
+            id: widget.hobby.id,
+            name: result['name'] ?? widget.hobby.name,
+            icon: result['icon'] ?? widget.hobby.icon,
+            time: _totalTime,
+            weeklyGoal: _weeklyGoal,
+            registeredTimes: _registeredTimes,
+            activeDays: _activeDays,
+          );
+          
+          _storageService.updateHobby(updatedHobby);
+          
+          // Actualizar la referencia al hobby
+          widget.hobby.time = _totalTime;
         });
         
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Hobby actualizado')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Hobby actualizado')),
+        );
       }
     });
+  }
+
+  void _deleteHobby() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Eliminar hobby'),
+          content: const Text('¿Estás seguro de que deseas eliminar este hobby?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () async {
+                try {
+                  await _storageService.deleteHobby(widget.hobby.id);
+                  Navigator.of(context).pop(); // Cerrar el diálogo
+                  Navigator.of(context).pop(true); // Volver a la pantalla anterior con resultado true para indicar eliminación
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error al eliminar: $e')),
+                  );
+                }
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -353,7 +406,16 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
     return WillPopScope(
       // Interceptar el botón de retroceso para devolver el hobby actualizado
       onWillPop: () async {
-        Navigator.pop(context, widget.hobby);
+        final updatedHobby = Hobby(
+          id: widget.hobby.id,
+          name: widget.hobby.name,
+          icon: widget.hobby.icon,
+          time: _totalTime,
+          weeklyGoal: _weeklyGoal,
+          registeredTimes: _registeredTimes,
+          activeDays: _activeDays,
+        );
+        Navigator.pop(context, updatedHobby);
         return false;
       },
       child: Scaffold(
@@ -366,7 +428,18 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
           centerTitle: true,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.black),
-            onPressed: () => Navigator.of(context).pop(widget.hobby),
+            onPressed: () {
+              final updatedHobby = Hobby(
+                id: widget.hobby.id,
+                name: widget.hobby.name,
+                icon: widget.hobby.icon,
+                time: _totalTime,
+                weeklyGoal: _weeklyGoal,
+                registeredTimes: _registeredTimes,
+                activeDays: _activeDays,
+              );
+              Navigator.of(context).pop(updatedHobby);
+            },
           ),
         ),
         body: Container(
@@ -375,7 +448,7 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
             children: [
               const SizedBox(height: 20),
               Text(
-                widget.hobby['name'],
+                widget.hobby.name,
                 style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
@@ -601,10 +674,7 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
                       children: [
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () {
-                              // Implementar eliminación
-                              Navigator.of(context).pop();
-                            },
+                            onPressed: _deleteHobby,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.red,
                               foregroundColor: Colors.white,
@@ -667,9 +737,11 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
   }
 }
 
+// La clase StopwatchScreen permanece igual, pero necesita ser actualizada para trabajar con el modelo Hobby
+
 // Pantalla del cronómetro integrada en el mismo archivo
 class StopwatchScreen extends StatefulWidget {
-  final Map<String, dynamic> hobby;
+  final Hobby hobby;
 
   const StopwatchScreen({super.key, required this.hobby});
 

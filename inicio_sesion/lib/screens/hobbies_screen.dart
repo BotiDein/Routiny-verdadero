@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../models/hobby.dart';
+import '../services/local_storage_service.dart';
 import 'hobby_form_screen.dart';
 import 'hobby_detail_screen.dart';
 
@@ -27,8 +29,35 @@ class HobbiesScreen extends StatefulWidget {
 }
 
 class _HobbiesScreenState extends State<HobbiesScreen> {
-  // Usar la instancia singleton para acceder a los hobbies
-  final _hobbiesData = HobbiesData();
+  final LocalStorageService _storageService = LocalStorageService();
+  List<Hobby> _hobbies = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHobbies();
+  }
+  
+  // Cargar hobbies al iniciar la pantalla
+  Future<void> _loadHobbies() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      final hobbies = await _storageService.getHobbies();
+      setState(() {
+        _hobbies = hobbies;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error al cargar hobbies: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,8 +74,11 @@ class _HobbiesScreenState extends State<HobbiesScreen> {
             ),
           ),
           Expanded(
-            child:
-                _hobbiesData.hobbies.isEmpty
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(),
+                  )
+                : _hobbies.isEmpty
                     ? const Center(
                       child: Text(
                         'No hay hobbies registrados.\nPresiona el botón + para agregar uno.',
@@ -54,25 +86,22 @@ class _HobbiesScreenState extends State<HobbiesScreen> {
                       ),
                     )
                     : ListView.builder(
-                      itemCount: _hobbiesData.hobbies.length,
+                      itemCount: _hobbies.length,
                       itemBuilder: (context, index) {
+                        final hobby = _hobbies[index];
                         return InkWell(
                           onTap: () {
                             // Navegar a la pantalla de detalles del hobby
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder:
-                                    (context) => HobbyDetailScreen(
-                                      hobby: _hobbiesData.hobbies[index],
-                                    ),
+                                builder: (context) => HobbyDetailScreen(hobby: hobby),
                               ),
-                            ).then((result) {
-                              // Actualizar el tiempo si se modificó en la pantalla de detalles
-                              if (result != null && result is Map<String, dynamic>) {
+                            ).then((updatedHobby) {
+                              if (updatedHobby != null && updatedHobby is Hobby) {
                                 setState(() {
-                                  // Actualizar el hobby con los datos que regresan
-                                  _hobbiesData.hobbies[index] = result;
+                                  _hobbies[index] = updatedHobby;
+                                  _storageService.updateHobby(updatedHobby);
                                 });
                               }
                             });
@@ -94,18 +123,18 @@ class _HobbiesScreenState extends State<HobbiesScreen> {
                               child: Row(
                                 children: [
                                   Text(
-                                    _hobbiesData.hobbies[index]['icon'],
+                                    hobby.icon,
                                     style: const TextStyle(fontSize: 24),
                                   ),
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: Text(
-                                      _hobbiesData.hobbies[index]['name'],
+                                      hobby.name,
                                       style: const TextStyle(fontSize: 16),
                                     ),
                                   ),
                                   Text(
-                                    _hobbiesData.hobbies[index]['time'],
+                                    hobby.time,
                                     style: const TextStyle(fontSize: 14),
                                   ),
                                   const SizedBox(width: 8),
@@ -128,10 +157,22 @@ class _HobbiesScreenState extends State<HobbiesScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const HobbyFormScreen()),
-          ).then((newHobby) {
-            if (newHobby != null) {
+          ).then((result) {
+            if (result != null && result is Map<String, dynamic>) {
+              // Convertir el mapa a un objeto Hobby
+              final newHobby = Hobby(
+                id: DateTime.now().millisecondsSinceEpoch.toString(),
+                name: result['name'] ?? '',
+                icon: result['icon'] ?? '😊',
+                time: result['time'] ?? '00:00:00',
+                weeklyGoal: result['weeklyGoal'] ?? '05:00:00',
+                registeredTimes: List<Map<String, dynamic>>.from(result['registeredTimes'] ?? []),
+                activeDays: List<int>.from(result['activeDays'] ?? []),
+              );
+              
               setState(() {
-                _hobbiesData.hobbies.add(newHobby);
+                _hobbies.add(newHobby);
+                _storageService.addHobby(newHobby);
               });
             }
           });
