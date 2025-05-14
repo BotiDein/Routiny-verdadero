@@ -25,7 +25,6 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  // Iniciar sesión con email y contraseña
   Future<void> loginWithEmail() async {
     if (!mounted) return;
 
@@ -52,7 +51,6 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  // Iniciar sesión con Google
   Future<void> loginWithGoogle() async {
     if (!mounted) return;
 
@@ -83,7 +81,6 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  // Mostrar diálogo para recuperar contraseña
   void mostrarDialogoRecuperacion() {
     final TextEditingController correoRecuperacion = TextEditingController();
 
@@ -203,7 +200,6 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 SizedBox(height: screenHeight * 0.03),
 
-                // Usuario
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
@@ -229,7 +225,6 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 SizedBox(height: screenHeight * 0.025),
 
-                // Contraseña
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
@@ -255,9 +250,8 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
 
-                // Enlace "¿Has olvidado tu contraseña?"
-                Align(
-                  alignment: Alignment.centerRight,
+                // CENTRADO del enlace
+                Center(
                   child: TextButton(
                     onPressed: mostrarDialogoRecuperacion,
                     child: Text(
@@ -272,7 +266,6 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 SizedBox(height: screenHeight * 0.03),
 
-                // Botón iniciar sesión
                 SizedBox(
                   width: buttonWidth,
                   height: buttonHeight,
@@ -293,7 +286,6 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 SizedBox(height: screenHeight * 0.03),
 
-                // Botón Google
                 SizedBox(
                   width: buttonWidth * 1.25,
                   height: buttonHeight,
@@ -333,7 +325,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
 
-                // Errores
                 if (error.isNotEmpty)
                   Padding(
                     padding: EdgeInsets.only(top: screenHeight * 0.02),
@@ -347,7 +338,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 SizedBox(height: screenHeight * 0.025),
 
-                // Enlace registrar
                 TextButton(
                   onPressed: () => Navigator.pushReplacement(
                     context,
