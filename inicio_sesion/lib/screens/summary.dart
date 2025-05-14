@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import '../models/task.dart';
 import '../models/habit.dart';
 import '../services/local_storage_service.dart';
+import '../services/firebase_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:math' as math;
 
@@ -15,6 +17,7 @@ class ResumenPersonalScreen extends StatefulWidget {
 
 class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
   final LocalStorageService _storageService = LocalStorageService();
+  late FirebaseService _firebaseService;
   bool _isLoading = true;
   
   // Datos para el resumen
@@ -39,11 +42,16 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
   
   // Actividad diaria
   Map<int, int> _activityByDay = {};
-  List<FlSpot> _activitySpots = [];
+  Map<int, int> _tasksByDay = {};
+  Map<int, int> _habitsByDay = {};
+  List<FlSpot> _activitySpots = []; // Añadir esta línea
   
   @override
   void initState() {
     super.initState();
+    // Obtener el ID del usuario actual o usar 'guest' si no hay usuario
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
+    _firebaseService = FirebaseService(userId);
     _loadMonthData();
   }
   
@@ -57,13 +65,17 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
       final firstDayOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
       final lastDayOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0, 23, 59, 59);
       
-      // Cargar tareas del mes (implementar según tu modelo de tareas)
-      // Por ahora, usamos una lista vacía
-      _monthTasks = [];
+      // Cargar tareas del mes desde Firebase
+      final tasks = await _firebaseService.getTasksForDateRange(firstDayOfMonth, lastDayOfMonth);
+      _monthTasks = tasks;
       
-      // Cargar hábitos
+      // Cargar hábitos desde almacenamiento local
       final habits = await _storageService.getHabits();
-      _monthHabits = habits;
+      
+      // Filtrar hábitos por fecha de creación (solo los creados antes o durante el mes seleccionado)
+      _monthHabits = habits.where((habit) {
+        return habit.createdAt.isBefore(lastDayOfMonth.add(const Duration(days: 1)));
+      }).toList();
       
       // Calcular estadísticas
       _calculateStatistics(firstDayOfMonth, lastDayOfMonth);
@@ -96,13 +108,14 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
     
     // Generar datos de actividad diaria de ejemplo
     _activityByDay = {};
+    _tasksByDay = {};
+    _habitsByDay = {};
     final daysInMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).day;
     for (int i = 1; i <= daysInMonth; i++) {
       _activityByDay[i] = 0;
+      _tasksByDay[i] = 0;
+      _habitsByDay[i] = 0;
     }
-    
-    // Preparar datos para el gráfico de actividad
-    _prepareActivityChart();
   }
   
   void _calculateStatistics(DateTime startDate, DateTime endDate) {
@@ -119,9 +132,13 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
     
     // Reiniciar actividad diaria
     _activityByDay = {};
+    _tasksByDay = {};
+    _habitsByDay = {};
     final daysInMonth = endDate.day;
     for (int i = 1; i <= daysInMonth; i++) {
       _activityByDay[i] = 0;
+      _tasksByDay[i] = 0;
+      _habitsByDay[i] = 0;
     }
     
     // Procesar tareas
@@ -130,6 +147,7 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
       if (task.isCompleted) {
         final day = task.date.day;
         _activityByDay[day] = (_activityByDay[day] ?? 0) + 1;
+        _tasksByDay[day] = (_tasksByDay[day] ?? 0) + 1;
       }
       
       // Calcular tiempo por categoría (estimado)
@@ -189,49 +207,54 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
         
         if (days.length > weekday && days[weekday] > 0) {
           _activityByDay[day] = (_activityByDay[day] ?? 0) + 1;
+          _habitsByDay[day] = (_habitsByDay[day] ?? 0) + 1;
         }
       }
     }
     
     // Calcular rachas
     _calculateStreaks();
-    
-    // Preparar datos para el gráfico de actividad
-    _prepareActivityChart();
   }
   
   void _calculateStreaks() {
     // Crear un mapa de actividad por fecha
     Map<String, bool> activityByDate = {};
+    final today = DateTime.now();
     
-    // Marcar días con tareas completadas
+    // Marcar días con tareas completadas (solo hasta hoy)
     for (var task in _monthTasks) {
       if (task.isCompleted) {
-        final dateStr = DateFormat('yyyy-MM-dd').format(task.date);
-        activityByDate[dateStr] = true;
+        // Solo considerar tareas hasta el día actual
+        if (!task.date.isAfter(today)) {
+          final dateStr = DateFormat('yyyy-MM-dd').format(task.date);
+          activityByDate[dateStr] = true;
+        }
       }
     }
     
-    // Marcar días con hábitos completados
+    // Marcar días con hábitos completados (solo hasta hoy)
     for (var habit in _monthHabits) {
       final days = habit.days;
       
-      // Recorrer el mes actual
+      // Recorrer el mes actual hasta hoy
       final daysInMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).day;
       for (int day = 1; day <= daysInMonth; day++) {
         final date = DateTime(_selectedMonth.year, _selectedMonth.month, day);
-        final weekday = date.weekday % 7; // 0-6 (0 = domingo)
         
-        if (days.length > weekday && days[weekday] == 2) { // 2 = completado
-          final dateStr = DateFormat('yyyy-MM-dd').format(date);
-          activityByDate[dateStr] = true;
+        // Solo considerar días hasta hoy
+        if (!date.isAfter(today)) {
+          final weekday = date.weekday % 7; // 0-6 (0 = domingo)
+          
+          if (days.length > weekday && days[weekday] == 2) { // 2 = completado
+            final dateStr = DateFormat('yyyy-MM-dd').format(date);
+            activityByDate[dateStr] = true;
+          }
         }
       }
     }
     
     // Calcular racha actual
     int currentStreak = 0;
-    DateTime today = DateTime.now();
     DateTime checkDate = today;
     
     // Retroceder hasta encontrar un día sin actividad
@@ -249,9 +272,10 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
     int longestStreak = 0;
     int tempStreak = 0;
     
-    // Ordenar fechas
+    // Ordenar fechas (solo hasta hoy)
     List<DateTime> dates = activityByDate.keys
         .map((dateStr) => DateFormat('yyyy-MM-dd').parse(dateStr))
+        .where((date) => !date.isAfter(today)) // Filtrar fechas futuras
         .toList()
       ..sort((a, b) => a.compareTo(b));
     
@@ -282,13 +306,9 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
     _longestStreak = longestStreak;
   }
   
+  // Ya no necesitamos este método porque ahora usamos un gráfico de barras
   void _prepareActivityChart() {
-    _activitySpots = _activityByDay.entries
-        .map((entry) => FlSpot(entry.key.toDouble(), entry.value.toDouble()))
-        .toList();
-    
-    // Ordenar por día
-    _activitySpots.sort((a, b) => a.x.compareTo(b.x));
+    // Este método ya no hace nada, pero lo mantenemos por si se llama desde algún lugar
   }
   
   // Función para comparar dos strings de tiempo (formato HH:MM:SS)
@@ -371,6 +391,8 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
                 const Text('• Si un día no completas ninguna actividad, tu racha actual se reinicia a 0.'),
                 const SizedBox(height: 8),
                 const Text('• La racha más larga muestra tu mejor secuencia de días consecutivos con actividades completadas.'),
+                const SizedBox(height: 8),
+                const Text('• Solo se cuentan actividades hasta el día actual, no se consideran actividades futuras.'),
                 const SizedBox(height: 16),
                 const Text(
                   '¡Mantén tu racha activa para desarrollar consistencia en tus hábitos!',
@@ -832,6 +854,8 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
   }
   
   Widget _buildActivityChart() {
+    final daysInMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).day;
+    
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -867,22 +891,54 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
           const SizedBox(height: 20),
           SizedBox(
             height: 220,
-            child: _activitySpots.isEmpty
+            child: _activityByDay.isEmpty
                 ? const Center(child: Text('No hay datos para mostrar'))
-                : LineChart(
-                    LineChartData(
-                      gridData: FlGridData(
-                        show: true,
-                        drawVerticalLine: false,
-                        horizontalInterval: 1,
-                        getDrawingHorizontalLine: (value) {
-                          return FlLine(
-                            color: Colors.grey.withOpacity(0.2),
-                            strokeWidth: 1,
-                          );
-                        },
+                : BarChart(
+                    BarChartData(
+                      alignment: BarChartAlignment.spaceAround,
+                      maxY: (_activityByDay.values.isEmpty ? 0 : _activityByDay.values.reduce((a, b) => a > b ? a : b)) + 1,
+                      barTouchData: BarTouchData(
+                        enabled: true,
+                        touchTooltipData: BarTouchTooltipData(
+                          tooltipBgColor: Colors.blueGrey.withOpacity(0.8),
+                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                            final day = group.x.toInt();
+                            final total = _activityByDay[day] ?? 0;
+                            final tasks = _tasksByDay[day] ?? 0;
+                            final habits = _habitsByDay[day] ?? 0;
+                            
+                            return BarTooltipItem(
+                              'Día $day\nTotal: $total\nTareas: $tasks\nHábitos: $habits',
+                              const TextStyle(color: Colors.white),
+                            );
+                          },
+                        ),
                       ),
                       titlesData: FlTitlesData(
+                        show: true,
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 30,
+                            getTitlesWidget: (value, meta) {
+                              // Mostrar solo algunos días para no sobrecargar
+                              if (value % 5 == 0 || value == 1 || value == daysInMonth) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    value.toInt().toString(),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                );
+                              }
+                              return const SizedBox();
+                            },
+                          ),
+                        ),
                         leftTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
@@ -906,66 +962,40 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
                             },
                           ),
                         ),
-                        rightTitles: AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
                         topTitles: AxisTitles(
                           sideTitles: SideTitles(showTitles: false),
                         ),
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 30,
-                            getTitlesWidget: (value, meta) {
-                              // Mostrar solo algunos días para no sobrecargar
-                              if (value % 5 == 0 || value == 1 || value == DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).day) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: Text(
-                                    value.toInt().toString(),
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                );
-                              }
-                              return const SizedBox();
-                            },
-                          ),
+                        rightTitles: AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
                         ),
                       ),
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        horizontalInterval: 1,
+                        getDrawingHorizontalLine: (value) {
+                          return FlLine(
+                            color: Colors.grey.withOpacity(0.2),
+                            strokeWidth: 1,
+                          );
+                        },
+                      ),
                       borderData: FlBorderData(show: false),
-                      lineBarsData: [
-                        LineChartBarData(
-                          spots: _activitySpots,
-                          isCurved: true,
-                          color: const Color(0xFF4A90E2),
-                          barWidth: 4,
-                          isStrokeCapRound: true,
-                          dotData: FlDotData(
-                            show: true,
-                            getDotPainter: (spot, percent, barData, index) {
-                              return FlDotCirclePainter(
-                                radius: 4,
-                                color: const Color(0xFF4A90E2),
-                                strokeWidth: 2,
-                                strokeColor: Colors.white,
-                              );
-                            },
-                          ),
-                          belowBarData: BarAreaData(
-                            show: true,
-                            color: const Color(0xFF4A90E2).withOpacity(0.2),
-                          ),
-                        ),
-                      ],
-                      minY: 0,
+                      barGroups: _getBarGroups(),
                     ),
                   ),
           ),
           const SizedBox(height: 16),
+          // Leyenda
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildLegendItem('Tareas', Colors.blue),
+              const SizedBox(width: 20),
+              _buildLegendItem('Hábitos', Colors.green),
+            ],
+          ),
+          const SizedBox(height: 8),
           const Center(
             child: Text(
               'Días del mes',
@@ -979,6 +1009,84 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
         ],
       ),
     );
+  }
+  
+  Widget _buildLegendItem(String label, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+  
+  List<BarChartGroupData> _getBarGroups() {
+    final daysInMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).day;
+    List<BarChartGroupData> barGroups = [];
+    
+    for (int day = 1; day <= daysInMonth; day++) {
+      final tasks = _tasksByDay[day] ?? 0;
+      final habits = _habitsByDay[day] ?? 0;
+      
+      // Solo mostrar barras para días con actividad
+      if (tasks > 0 || habits > 0) {
+        barGroups.add(
+          BarChartGroupData(
+            x: day,
+            barRods: [
+              BarChartRodData(
+                toY: tasks.toDouble(),
+                color: Colors.blue,
+                width: 8,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(4),
+                  topRight: Radius.circular(4),
+                ),
+              ),
+              BarChartRodData(
+                toY: habits.toDouble(),
+                color: Colors.green,
+                width: 8,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(4),
+                  topRight: Radius.circular(4),
+                ),
+              ),
+            ],
+          ),
+        );
+      } else {
+        // Añadir barras vacías para días sin actividad
+        barGroups.add(
+          BarChartGroupData(
+            x: day,
+            barRods: [
+              BarChartRodData(
+                toY: 0,
+                color: Colors.grey.withOpacity(0.2),
+                width: 8,
+              ),
+            ],
+          ),
+        );
+      }
+    }
+    
+    return barGroups;
   }
   
   Widget _buildStatisticsSection() {
