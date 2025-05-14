@@ -11,6 +11,7 @@ class Habit {
   final dynamic current; // puede ser int, String o bool dependiendo del tipo
   final int amount;
   final List<int> days; // 0: no registrado, 1: parcial, 2: completado
+  final Map<String, int> completedDates; // Formato: 'yyyy-MM-dd' -> estado (0, 1, 2)
   final DateTime createdAt;
 
   Habit({
@@ -25,7 +26,8 @@ class Habit {
     this.amount = 1,
     required this.days,
     required this.createdAt,
-  });
+    Map<String, int>? completedDates,
+  }) : this.completedDates = completedDates ?? {};
 
   // Convertir Habit a Map
   Map<String, dynamic> toMap() {
@@ -41,6 +43,7 @@ class Habit {
       'amount': amount,
       'days': days,
       'createdAt': createdAt.toIso8601String(),
+      'completedDates': completedDates,
     };
   }
 
@@ -118,6 +121,14 @@ class Habit {
       }
     }
 
+    // Procesar el mapa de fechas completadas
+    Map<String, int> completedDatesMap = {};
+    if (map['completedDates'] != null) {
+      if (map['completedDates'] is Map) {
+        completedDatesMap = Map<String, int>.from(map['completedDates']);
+      }
+    }
+
     return Habit(
       id: map['id'] ?? '',
       name: map['name'] ?? '',
@@ -132,6 +143,7 @@ class Habit {
       createdAt: map['createdAt'] != null 
           ? DateTime.parse(map['createdAt']) 
           : DateTime.now(),
+      completedDates: completedDatesMap,
     );
   }
 
@@ -151,6 +163,7 @@ class Habit {
     int? amount,
     List<int>? days,
     DateTime? createdAt,
+    Map<String, int>? completedDates,
   }) {
     return Habit(
       id: id ?? this.id,
@@ -164,6 +177,7 @@ class Habit {
       amount: amount ?? this.amount,
       days: days ?? List<int>.from(this.days),
       createdAt: createdAt ?? this.createdAt,
+      completedDates: completedDates ?? Map<String, int>.from(this.completedDates),
     );
   }
 }

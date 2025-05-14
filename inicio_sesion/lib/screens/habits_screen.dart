@@ -51,117 +51,100 @@ class _HabitsScreenState extends State<HabitsScreen> {
     }
   }
 
-  void _incrementHabit(int index) async {
-    if (index < 0 || index >= _habits.length) return;
-    
-    try {
-      final habit = _habits[index];
-      
-      if (habit.type == 'count') {
-        final current = habit.current is int ? habit.current as int : 0;
-        final goal = habit.goal is int ? habit.goal as int : 0;
-        
-        if (goal == 0 || current < goal) {
-          // Crear una copia del hábito con el valor actualizado
-          final updatedDays = List<int>.from(habit.days);
-          final today = DateTime.now().weekday % 7;
-          
-          // Actualizar el estado del día actual
-          if (goal > 0 && current + 1 >= goal) {
-            updatedDays[today] = 2; // Completado
-          } else {
-            updatedDays[today] = 1; // Parcial
-          }
-          
-          final updatedHabit = habit.copyWith(
-            current: current + 1,
-            days: updatedDays,
-          );
-          
-          // Actualizar la UI primero
-          setState(() {
-            _habits[index] = updatedHabit;
-          });
-          
-          // Guardar en almacenamiento local
-          await _storageService.updateHabit(updatedHabit);
-        }
-      }
-    } catch (e) {
-      print('Error al incrementar hábito: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al actualizar: $e')),
-        );
-      }
-    }
-  }
+// Modificar los métodos para usar fechas específicas en lugar de días de la semana
 
-  void _decrementHabit(int index) async {
-    if (index < 0 || index >= _habits.length) return;
+// Modificar el método _incrementHabit
+void _incrementHabit(int index) async {
+  if (index < 0 || index >= _habits.length) return;
+  
+  try {
+    final habit = _habits[index];
     
-    try {
-      final habit = _habits[index];
+    if (habit.type == 'count') {
+      final current = habit.current is int ? habit.current as int : 0;
+      final goal = habit.goal is int ? habit.goal as int : 0;
       
-      if (habit.type == 'count') {
-        final current = habit.current is int ? habit.current as int : 0;
-        
-        if (current > 0) {
-          // Crear una copia del hábito con el valor actualizado
-          final updatedDays = List<int>.from(habit.days);
-          final today = DateTime.now().weekday % 7;
-          final goal = habit.goal is int ? habit.goal as int : 0;
-          
-          // Actualizar el estado del día actual
-          if (current - 1 <= 0) {
-            updatedDays[today] = 0; // No registrado
-          } else if (goal > 0 && current - 1 < goal) {
-            updatedDays[today] = 1; // Parcial
-          }
-          
-          final updatedHabit = habit.copyWith(
-            current: current - 1,
-            days: updatedDays,
-          );
-          
-          // Actualizar la UI primero
-          setState(() {
-            _habits[index] = updatedHabit;
-          });
-          
-          // Guardar en almacenamiento local
-          await _storageService.updateHabit(updatedHabit);
-        }
-      }
-    } catch (e) {
-      print('Error al decrementar hábito: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al actualizar: $e')),
-        );
-      }
-    }
-  }
-
-  void _toggleBooleanHabit(int index) async {
-    if (index < 0 || index >= _habits.length) return;
-    
-    try {
-      final habit = _habits[index];
-      
-      if (habit.type == 'boolean') {
-        final current = habit.current is bool ? habit.current as bool : false;
-        
+      if (goal == 0 || current < goal) {
         // Crear una copia del hábito con el valor actualizado
         final updatedDays = List<int>.from(habit.days);
         final today = DateTime.now().weekday % 7;
         
         // Actualizar el estado del día actual
-        updatedDays[today] = !current ? 2 : 0; // 2 = completado, 0 = no registrado
+        if (goal > 0 && current + 1 >= goal) {
+          updatedDays[today] = 2; // Completado
+        } else {
+          updatedDays[today] = 1; // Parcial
+        }
+        
+        // Actualizar el mapa de fechas específicas
+        final todayStr = _formatDate(DateTime.now());
+        final updatedCompletedDates = Map<String, int>.from(habit.completedDates);
+        updatedCompletedDates[todayStr] = goal > 0 && current + 1 >= goal ? 2 : 1;
         
         final updatedHabit = habit.copyWith(
-          current: !current,
+          current: current + 1,
           days: updatedDays,
+          completedDates: updatedCompletedDates,
+        );
+        
+        // Actualizar la UI primero
+        setState(() {
+          _habits[index] = updatedHabit;
+        });
+        
+        // Depurar fechas completadas
+        _debugPrintCompletedDates(updatedHabit);
+        
+        // Guardar en almacenamiento local
+        await _storageService.updateHabit(updatedHabit);
+      }
+    }
+  } catch (e) {
+    print('Error al incrementar hábito: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al actualizar: $e')),
+      );
+    }
+  }
+}
+
+// Modificar el método _decrementHabit
+void _decrementHabit(int index) async {
+  if (index < 0 || index >= _habits.length) return;
+  
+  try {
+    final habit = _habits[index];
+    
+    if (habit.type == 'count') {
+      final current = habit.current is int ? habit.current as int : 0;
+      
+      if (current > 0) {
+        // Crear una copia del hábito con el valor actualizado
+        final updatedDays = List<int>.from(habit.days);
+        final today = DateTime.now().weekday % 7;
+        final goal = habit.goal is int ? habit.goal as int : 0;
+        
+        // Actualizar el estado del día actual
+        if (current - 1 <= 0) {
+          updatedDays[today] = 0; // No registrado
+        } else if (goal > 0 && current - 1 < goal) {
+          updatedDays[today] = 1; // Parcial
+        }
+        
+        // Actualizar el mapa de fechas específicas
+        final todayStr = _formatDate(DateTime.now());
+        final updatedCompletedDates = Map<String, int>.from(habit.completedDates);
+        if (current - 1 <= 0) {
+          updatedCompletedDates.remove(todayStr); // Eliminar si no hay progreso
+        } else {
+          updatedCompletedDates[todayStr] = goal > 0 && current - 1 < goal ? 1 : 2;
+        }
+        
+        final updatedHabit = habit.copyWith(
+          current: current - 1,
+          days: updatedDays,
+          completedDates: updatedCompletedDates,
         );
         
         // Actualizar la UI primero
@@ -172,221 +155,302 @@ class _HabitsScreenState extends State<HabitsScreen> {
         // Guardar en almacenamiento local
         await _storageService.updateHabit(updatedHabit);
       }
-    } catch (e) {
-      print('Error al cambiar hábito booleano: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al actualizar: $e')),
-        );
-      }
+    }
+  } catch (e) {
+    print('Error al decrementar hábito: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al actualizar: $e')),
+      );
     }
   }
+}
 
-  void _showRegisterTimeDialog(int index) {
-    if (index < 0 || index >= _habits.length) return;
-    
+// Modificar el método _toggleBooleanHabit
+void _toggleBooleanHabit(int index) async {
+  if (index < 0 || index >= _habits.length) return;
+  
+  try {
     final habit = _habits[index];
-    String currentTime = habit.current is String ? habit.current as String : '00:00:00';
     
-    // Extraer horas, minutos y segundos del tiempo actual
-    List<String> timeParts = currentTime.split(':');
-    int hours = int.tryParse(timeParts[0]) ?? 0;
-    int minutes = int.tryParse(timeParts[1]) ?? 0;
-    int seconds = int.tryParse(timeParts[2]) ?? 0;
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Registrar Tiempo'),
-          content: StatefulBuilder(
-            builder: (BuildContext context, StateSetter setState) {
-              return SizedBox(
-                height: 180,
-                child: Column(
-                  children: [
-                    const Text('Selecciona el tiempo a registrar:'),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        // Horas
-                        Column(
-                          children: [
-                            const Text('Horas'),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_drop_up),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (hours < 23) hours++;
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
-                            Text(
-                              hours.toString().padLeft(2, '0'),
-                              style: const TextStyle(fontSize: 24),
-                            ),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_drop_down),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (hours > 0) hours--;
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        // Minutos
-                        Column(
-                          children: [
-                            const Text('Minutos'),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_drop_up),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (minutes < 59) minutes++;
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
-                            Text(
-                              minutes.toString().padLeft(2, '0'),
-                              style: const TextStyle(fontSize: 24),
-                            ),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_drop_down),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (minutes > 0) minutes--;
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        // Segundos
-                        Column(
-                          children: [
-                            const Text('Segundos'),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_drop_up),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (seconds < 59) seconds++;
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
-                            Text(
-                              seconds.toString().padLeft(2, '0'),
-                              style: const TextStyle(fontSize: 24),
-                            ),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_drop_down),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (seconds > 0) seconds--;
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () async {
-                try {
-                  // Actualizar el tiempo del hábito
-                  final newTime =
-                      '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-                  
-                  // Crear una copia del hábito con el valor actualizado
-                  final updatedDays = List<int>.from(habit.days);
-                  final today = DateTime.now().weekday % 7;
-                  final goalTime = habit.goal is String ? habit.goal as String : '00:00:00';
-                  
-                  // Determinar el estado basado en el progreso
-                  if (hours > 0 || minutes > 0 || seconds > 0) {
-                    // Comparar con el objetivo
-                    List<String> goalParts = goalTime.split(':');
-                    int goalHours = int.tryParse(goalParts[0]) ?? 0;
-                    int goalMinutes = int.tryParse(goalParts[1]) ?? 0;
-                    int goalSeconds = int.tryParse(goalParts[2]) ?? 0;
-                    
-                    int totalSeconds = hours * 3600 + minutes * 60 + seconds;
-                    int goalTotalSeconds = goalHours * 3600 + goalMinutes * 60 + goalSeconds;
-                    
-                    if (totalSeconds >= goalTotalSeconds && goalTotalSeconds > 0) {
-                      updatedDays[today] = 2; // Completado
-                    } else {
-                      updatedDays[today] = 1; // Parcial
-                    }
-                  } else {
-                    updatedDays[today] = 0; // No registrado
-                  }
-                  
-                  final updatedHabit = habit.copyWith(
-                    current: newTime,
-                    days: updatedDays,
-                  );
-                  
-                  // Actualizar la UI primero
-                  setState(() {
-                    _habits[index] = updatedHabit;
-                  });
-                  
-                  // Guardar en almacenamiento local
-                  await _storageService.updateHabit(updatedHabit);
-                  
-                  Navigator.of(context).pop();
-                } catch (e) {
-                  print('Error al guardar tiempo: $e');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error al guardar: $e')),
-                  );
-                  Navigator.of(context).pop();
-                }
-              },
-              child: const Text('Guardar'),
-            ),
-          ],
-        );
-      },
-    );
+    if (habit.type == 'boolean') {
+      final current = habit.current is bool ? habit.current as bool : false;
+      
+      // Crear una copia del hábito con el valor actualizado
+      final updatedDays = List<int>.from(habit.days);
+      final today = DateTime.now().weekday % 7;
+      
+      // Actualizar el estado del día actual
+      updatedDays[today] = !current ? 2 : 0; // 2 = completado, 0 = no registrado
+      
+      // Actualizar el mapa de fechas específicas
+      final todayStr = _formatDate(DateTime.now());
+      final updatedCompletedDates = Map<String, int>.from(habit.completedDates);
+      if (!current) {
+        updatedCompletedDates[todayStr] = 2; // Completado
+      } else {
+        updatedCompletedDates.remove(todayStr); // Eliminar si se desmarca
+      }
+      
+      final updatedHabit = habit.copyWith(
+        current: !current,
+        days: updatedDays,
+        completedDates: updatedCompletedDates,
+      );
+      
+      // Actualizar la UI primero
+      setState(() {
+        _habits[index] = updatedHabit;
+      });
+      
+      // Guardar en almacenamiento local
+      await _storageService.updateHabit(updatedHabit);
+    }
+  } catch (e) {
+    print('Error al cambiar hábito booleano: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al actualizar: $e')),
+      );
+    }
   }
+}
+
+// Modificar el método _showRegisterTimeDialog
+void _showRegisterTimeDialog(int index) {
+  if (index < 0 || index >= _habits.length) return;
+  
+  final habit = _habits[index];
+  String currentTime = habit.current is String ? habit.current as String : '00:00:00';
+  
+  // Extraer horas, minutos y segundos del tiempo actual
+  List<String> timeParts = currentTime.split(':');
+  int hours = int.tryParse(timeParts[0]) ?? 0;
+  int minutes = int.tryParse(timeParts[1]) ?? 0;
+  int seconds = int.tryParse(timeParts[2]) ?? 0;
+
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: const Text('Registrar Tiempo'),
+        content: StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            return SizedBox(
+              height: 180,
+              child: Column(
+                children: [
+                  const Text('Selecciona el tiempo a registrar:'),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      // Horas
+                      Column(
+                        children: [
+                          const Text('Horas'),
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.arrow_drop_up),
+                                onPressed: () {
+                                  setState(() {
+                                    if (hours < 23) hours++;
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                          Text(
+                            hours.toString().padLeft(2, '0'),
+                            style: const TextStyle(fontSize: 24),
+                          ),
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.arrow_drop_down),
+                                onPressed: () {
+                                  setState(() {
+                                    if (hours > 0) hours--;
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      // Minutos
+                      Column(
+                        children: [
+                          const Text('Minutos'),
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.arrow_drop_up),
+                                onPressed: () {
+                                  setState(() {
+                                    if (minutes < 59) minutes++;
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                          Text(
+                            minutes.toString().padLeft(2, '0'),
+                            style: const TextStyle(fontSize: 24),
+                          ),
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.arrow_drop_down),
+                                onPressed: () {
+                                  setState(() {
+                                    if (minutes > 0) minutes--;
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      // Segundos
+                      Column(
+                        children: [
+                          const Text('Segundos'),
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.arrow_drop_up),
+                                onPressed: () {
+                                  setState(() {
+                                    if (seconds < 59) seconds++;
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                          Text(
+                            seconds.toString().padLeft(2, '0'),
+                            style: const TextStyle(fontSize: 24),
+                          ),
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.arrow_drop_down),
+                                onPressed: () {
+                                  setState(() {
+                                    if (seconds > 0) seconds--;
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () async {
+              try {
+                // Actualizar el tiempo del hábito
+                final newTime =
+                    '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+                
+                // Crear una copia del hábito con el valor actualizado
+                final updatedDays = List<int>.from(habit.days);
+                final today = DateTime.now().weekday % 7;
+                final goalTime = habit.goal is String ? habit.goal as String : '00:00:00';
+                
+                // Determinar el estado basado en el progreso
+                int status = 0;
+                if (hours > 0 || minutes > 0 || seconds > 0) {
+                  // Comparar con el objetivo
+                  List<String> goalParts = goalTime.split(':');
+                  int goalHours = int.tryParse(goalParts[0]) ?? 0;
+                  int goalMinutes = int.tryParse(goalParts[1]) ?? 0;
+                  int goalSeconds = int.tryParse(goalParts[2]) ?? 0;
+                  
+                  int totalSeconds = hours * 3600 + minutes * 60 + seconds;
+                  int goalTotalSeconds = goalHours * 3600 + goalMinutes * 60 + goalSeconds;
+                  
+                  if (totalSeconds >= goalTotalSeconds && goalTotalSeconds > 0) {
+                    status = 2; // Completado
+                  } else {
+                    status = 1; // Parcial
+                  }
+                }
+                
+                updatedDays[today] = status;
+                
+                // Actualizar el mapa de fechas específicas
+                final todayStr = _formatDate(DateTime.now());
+                final updatedCompletedDates = Map<String, int>.from(habit.completedDates);
+                if (status > 0) {
+                  updatedCompletedDates[todayStr] = status;
+                } else {
+                  updatedCompletedDates.remove(todayStr);
+                }
+                
+                final updatedHabit = habit.copyWith(
+                  current: newTime,
+                  days: updatedDays,
+                  completedDates: updatedCompletedDates,
+                );
+                
+                // Actualizar la UI primero
+                setState(() {
+                  _habits[index] = updatedHabit;
+                });
+                
+                // Guardar en almacenamiento local
+                await _storageService.updateHabit(updatedHabit);
+                
+                Navigator.of(context).pop();
+              } catch (e) {
+                print('Error al guardar tiempo: $e');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error al guardar: $e')),
+                );
+                Navigator.of(context).pop();
+              }
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+// Asegurémonos de que estamos guardando correctamente las fechas en el formato adecuado
+// Modificar el método _formatDate para asegurarnos de que el formato sea correcto
+
+String _formatDate(DateTime date) {
+  return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+}
+
+// También vamos a añadir un método de depuración para verificar las fechas guardadas
+// Añadir este método después de _formatDate
+
+void _debugPrintCompletedDates(Habit habit) {
+  print('Hábito: ${habit.name}');
+  print('Fechas completadas:');
+  habit.completedDates.forEach((date, status) {
+    print('  $date: $status');
+  });
+}
 
   Future<void> _showAddHabitScreen() async {
     final result = await Navigator.push(

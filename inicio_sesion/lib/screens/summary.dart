@@ -118,6 +118,8 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
     }
   }
   
+  // Modificar el método _calculateStatistics para usar fechas específicas
+
   void _calculateStatistics(DateTime startDate, DateTime endDate) {
     // Reiniciar contadores
     _totalTasks = _monthTasks.length;
@@ -157,7 +159,10 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
       _timeSpent[category] = (_timeSpent[category] ?? 0) + timeValue;
     }
     
-    // Procesar hábitos usando el modelo Habit
+    // Modificar el método _calculateStatistics para corregir la visualización de hábitos en la gráfica
+    // Buscar la sección donde procesamos los hábitos y reemplazarla con este código:
+
+    // Procesar hábitos usando el modelo Habit y fechas específicas
     for (var habit in _monthHabits) {
       final category = habit.category;
       final type = habit.type;
@@ -197,18 +202,28 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
       
       _timeSpent[category] = (_timeSpent[category] ?? 0) + timeValue;
       
-      // Contar actividad por día para hábitos
-      final days = habit.days;
-      
-      // Recorrer el mes y verificar los días con actividad
-      for (int day = 1; day <= daysInMonth; day++) {
-        final date = DateTime(_selectedMonth.year, _selectedMonth.month, day);
-        final weekday = date.weekday % 7; // 0-6 (0 = domingo)
-        
-        if (days.length > weekday && days[weekday] > 0) {
-          _activityByDay[day] = (_activityByDay[day] ?? 0) + 1;
-          _habitsByDay[day] = (_habitsByDay[day] ?? 0) + 1;
-        }
+      // Contar actividad por día para hábitos usando fechas específicas
+      if (habit.completedDates.isNotEmpty) {
+        // Recorrer todas las fechas completadas
+        habit.completedDates.forEach((dateStr, status) {
+          try {
+            // Convertir la cadena de fecha a objeto DateTime
+            final date = DateTime.parse(dateStr);
+            
+            // Verificar si la fecha está dentro del mes seleccionado
+            if (date.year == _selectedMonth.year && date.month == _selectedMonth.month) {
+              final day = date.day;
+              
+              // Solo contar si el estado es mayor que 0 (parcial o completado)
+              if (status > 0) {
+                _activityByDay[day] = (_activityByDay[day] ?? 0) + 1;
+                _habitsByDay[day] = (_habitsByDay[day] ?? 0) + 1;
+              }
+            }
+          } catch (e) {
+            print('Error al procesar fecha de hábito: $e');
+          }
+        });
       }
     }
     
@@ -216,6 +231,7 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
     _calculateStreaks();
   }
   
+  // Modificar el método _calculateStreaks para usar fechas específicas
   void _calculateStreaks() {
     // Crear un mapa de actividad por fecha
     Map<String, bool> activityByDate = {};
@@ -234,23 +250,16 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
     
     // Marcar días con hábitos completados (solo hasta hoy)
     for (var habit in _monthHabits) {
-      final days = habit.days;
-      
-      // Recorrer el mes actual hasta hoy
-      final daysInMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).day;
-      for (int day = 1; day <= daysInMonth; day++) {
-        final date = DateTime(_selectedMonth.year, _selectedMonth.month, day);
-        
-        // Solo considerar días hasta hoy
-        if (!date.isAfter(today)) {
-          final weekday = date.weekday % 7; // 0-6 (0 = domingo)
-          
-          if (days.length > weekday && days[weekday] == 2) { // 2 = completado
-            final dateStr = DateFormat('yyyy-MM-dd').format(date);
+      // Usar el mapa de fechas específicas
+      habit.completedDates.forEach((dateStr, status) {
+        if (status == 2) { // Solo contar como completado si el estado es 2
+          final date = DateTime.parse(dateStr);
+          // Solo considerar días hasta hoy
+          if (!date.isAfter(today)) {
             activityByDate[dateStr] = true;
           }
         }
-      }
+      });
     }
     
     // Calcular racha actual
@@ -304,6 +313,11 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
     
     _currentStreak = currentStreak;
     _longestStreak = longestStreak;
+  }
+
+  // Añadir este método auxiliar para formatear fechas
+  String _formatDate(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
   
   // Ya no necesitamos este método porque ahora usamos un gráfico de barras
