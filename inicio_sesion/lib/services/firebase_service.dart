@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/task.dart';
+import '../models/habit.dart'; // Importar el modelo Habit
 
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -134,21 +135,53 @@ class FirebaseService {
     return result;
   }
   
-  // MÉTODOS PARA HÁBITOS
+  // MÉTODOS PARA HÁBITOS - ACTUALIZADOS PARA USAR EL MODELO HABIT
   
-  // Obtener todos los hábitos
-  Future<List<Map<String, dynamic>>> getHabits() async {
+  // Obtener todos los hábitos como Stream
+  Stream<List<Habit>> getHabits() {
     try {
-      // Intentar obtener hábitos de Firebase
+      return _habitsCollection
+          .snapshots()
+          .map((snapshot) {
+            if (snapshot.docs.isEmpty) {
+              // Si no hay hábitos, devolver datos de ejemplo
+              return _getDemoHabits();
+            }
+            return snapshot.docs.map((doc) {
+              try {
+                return Habit.fromMap(doc.data() as Map<String, dynamic>);
+              } catch (e) {
+                print('Error al convertir documento a Habit: $e');
+                // Devolver un hábito por defecto en caso de error
+                return _getDefaultHabit(doc.id);
+              }
+            }).toList();
+          });
+    } catch (e) {
+      print('Error en getHabits(): $e');
+      // Devolver un stream con datos de ejemplo en caso de error
+      return Stream.value(_getDemoHabits());
+    }
+  }
+  
+  // Obtener todos los hábitos como Future
+  Future<List<Habit>> getHabitsFuture() async {
+    try {
       final snapshot = await _habitsCollection.get();
       
       if (snapshot.docs.isEmpty) {
-        // Si no hay hábitos en Firebase, usar datos de ejemplo
+        // Si no hay hábitos, devolver datos de ejemplo
         return _getDemoHabits();
       }
       
       return snapshot.docs.map((doc) {
-        return doc.data() as Map<String, dynamic>;
+        try {
+          return Habit.fromMap(doc.data() as Map<String, dynamic>);
+        } catch (e) {
+          print('Error al convertir documento a Habit: $e');
+          // Devolver un hábito por defecto en caso de error
+          return _getDefaultHabit(doc.id);
+        }
       }).toList();
     } catch (e) {
       print('Error al obtener hábitos: $e');
@@ -157,44 +190,114 @@ class FirebaseService {
     }
   }
   
+  // Añadir un nuevo hábito
+  Future<void> addHabit(Habit habit) async {
+    try {
+      await _habitsCollection.doc(habit.id).set(habit.toMap());
+    } catch (e) {
+      print('Error al añadir hábito: $e');
+      throw Exception('No se pudo añadir el hábito: $e');
+    }
+  }
+  
+  // Actualizar un hábito existente
+  Future<void> updateHabit(Habit habit) async {
+    try {
+      await _habitsCollection.doc(habit.id).update(habit.toMap());
+    } catch (e) {
+      print('Error al actualizar hábito: $e');
+      throw Exception('No se pudo actualizar el hábito: $e');
+    }
+  }
+  
+  // Eliminar un hábito
+  Future<void> deleteHabit(String habitId) async {
+    try {
+      await _habitsCollection.doc(habitId).delete();
+    } catch (e) {
+      print('Error al eliminar hábito: $e');
+      throw Exception('No se pudo eliminar el hábito: $e');
+    }
+  }
+  
+  // Actualizar el estado de un hábito para el día actual
+  Future<void> updateHabitStatus(String habitId, int status) async {
+    try {
+      // Obtener el hábito actual
+      final doc = await _habitsCollection.doc(habitId).get();
+      
+      if (!doc.exists) {
+        throw Exception('El hábito no existe');
+      }
+      
+      final habit = Habit.fromMap(doc.data() as Map<String, dynamic>);
+      
+      // Actualizar el estado para el día actual
+      final today = DateTime.now().weekday % 7; // 0-6 (0 = domingo)
+      final updatedDays = List<int>.from(habit.days);
+      updatedDays[today] = status;
+      
+      // Actualizar en Firestore
+      await _habitsCollection.doc(habitId).update({'days': updatedDays});
+    } catch (e) {
+      print('Error al actualizar estado del hábito: $e');
+      throw Exception('No se pudo actualizar el estado del hábito: $e');
+    }
+  }
+  
+  // Hábito por defecto en caso de error
+  Habit _getDefaultHabit(String id) {
+    return Habit(
+      id: id,
+      name: 'Hábito (error)',
+      category: 'General',
+      type: 'count',
+      description: 'Hubo un error al cargar este hábito',
+      days: [0, 0, 0, 0, 0, 0, 0],
+      createdAt: DateTime.now(),
+    );
+  }
+  
   // Datos de ejemplo para hábitos (en caso de que no haya datos en Firebase)
-  List<Map<String, dynamic>> _getDemoHabits() {
+  List<Habit> _getDemoHabits() {
     return [
-      {
-        'id': '1',
-        'name': 'Salir a correr',
-        'category': 'Ejercicio',
-        'type': 'count',
-        'option': 'Al menos',
-        'goal': 30,
-        'amount': 5,
-        'current': 20,
-        'description': 'Correr al menos 30 minutos diarios',
-        'days': [0, 1, 2, 1, 0, 1, 0], // 0: no registrado, 1: parcial, 2: completado
-        'createdAt': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 30))),
-      },
-      {
-        'id': '2',
-        'name': 'Meditar',
-        'category': 'Salud',
-        'type': 'time',
-        'option': 'Al menos',
-        'goal': '00:15:00',
-        'current': '00:10:00',
-        'description': 'Meditar al menos 15 minutos diarios',
-        'days': [2, 0, 2, 2, 1, 0, 0],
-        'createdAt': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 20))),
-      },
-      {
-        'id': '3',
-        'name': 'Leer',
-        'category': 'Educación',
-        'type': 'boolean',
-        'current': true,
-        'description': 'Leer al menos un capítulo diario',
-        'days': [2, 2, 0, 2, 2, 0, 0],
-        'createdAt': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 15))),
-      },
+      Habit(
+        id: '1',
+        name: 'Salir a correr',
+        category: 'Ejercicio',
+        type: 'count',
+        option: 'Al menos',
+        goal: 30,
+        current: 20,
+        amount: 5,
+        description: 'Correr al menos 30 minutos diarios',
+        days: [0, 1, 2, 1, 0, 1, 0], // 0: no registrado, 1: parcial, 2: completado
+        createdAt: DateTime.now().subtract(const Duration(days: 30)),
+      ),
+      Habit(
+        id: '2',
+        name: 'Meditar',
+        category: 'Salud',
+        type: 'time',
+        option: 'Al menos',
+        goal: '00:15:00',
+        current: '00:10:00',
+        description: 'Meditar al menos 15 minutos diarios',
+        days: [2, 0, 2, 2, 1, 0, 0],
+        createdAt: DateTime.now().subtract(const Duration(days: 20)),
+      ),
+      Habit(
+        id: '3',
+        name: 'Leer',
+        category: 'Educación',
+        type: 'boolean',
+        option: 'Sin objetivo',
+        goal: null,
+        current: true,
+        description: 'Leer al menos un capítulo diario',
+        days: [2, 2, 0, 2, 2, 0, 0],
+        createdAt: DateTime.now().subtract(const Duration(days: 15)),
+      ),
     ];
   }
   

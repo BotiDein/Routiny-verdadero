@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
 
 class Habit {
   final String id;
@@ -20,14 +20,14 @@ class Habit {
     required this.category,
     required this.type,
     this.option = 'Al menos',
-    this.goal = 0,
-    this.current = 0,
-    this.amount = 0,
+    this.goal,
+    this.current,
+    this.amount = 1,
     required this.days,
     required this.createdAt,
   });
 
-  // Convertir a Map para Firebase
+  // Convertir Habit a Map
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -40,69 +40,130 @@ class Habit {
       'current': current,
       'amount': amount,
       'days': days,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 
-  // Crear desde Map de Firebase
+  // Convertir Habit a JSON
+  String toJson() => json.encode(toMap());
+
+  // Crear Habit desde Map
   factory Habit.fromMap(Map<String, dynamic> map) {
+    // Asegurar que days sea una lista de enteros
+    List<int> daysList = [];
+    if (map['days'] != null) {
+      if (map['days'] is List) {
+        daysList = List<int>.from(
+          (map['days'] as List).map((item) => item is int ? item : 0),
+        );
+      }
+    }
+    
+    // Si la lista está vacía o tiene menos de 7 elementos, rellenarla
+    while (daysList.length < 7) {
+      daysList.add(0);
+    }
+
+    // Manejar diferentes tipos de datos para current
+    dynamic currentValue = map['current'];
+    if (map['type'] == 'count') {
+      // Asegurar que current sea un entero para tipo 'count'
+      if (currentValue is int) {
+        // Ya es un entero, no hacer nada
+      } else if (currentValue is String) {
+        // Intentar convertir de string a entero
+        currentValue = int.tryParse(currentValue) ?? 0;
+      } else {
+        // Valor por defecto
+        currentValue = 0;
+      }
+    } else if (map['type'] == 'time') {
+      // Asegurar que current sea un string para tipo 'time'
+      if (currentValue is String) {
+        // Ya es un string, no hacer nada
+      } else {
+        // Valor por defecto
+        currentValue = '00:00:00';
+      }
+    } else if (map['type'] == 'boolean') {
+      // Asegurar que current sea un booleano para tipo 'boolean'
+      if (currentValue is bool) {
+        // Ya es un booleano, no hacer nada
+      } else {
+        // Convertir a booleano
+        currentValue = currentValue == true || currentValue == 'true';
+      }
+    }
+
+    // Manejar diferentes tipos de datos para goal
+    dynamic goalValue = map['goal'];
+    if (map['type'] == 'count') {
+      // Asegurar que goal sea un entero para tipo 'count'
+      if (goalValue is int) {
+        // Ya es un entero, no hacer nada
+      } else if (goalValue is String) {
+        // Intentar convertir de string a entero
+        goalValue = int.tryParse(goalValue) ?? 0;
+      } else {
+        // Valor por defecto
+        goalValue = 0;
+      }
+    } else if (map['type'] == 'time') {
+      // Asegurar que goal sea un string para tipo 'time'
+      if (goalValue is String) {
+        // Ya es un string, no hacer nada
+      } else {
+        // Valor por defecto
+        goalValue = '00:00:00';
+      }
+    }
+
     return Habit(
       id: map['id'] ?? '',
       name: map['name'] ?? '',
       description: map['description'] ?? '',
-      category: map['category'] ?? 'Ejercicio',
+      category: map['category'] ?? '',
       type: map['type'] ?? 'count',
       option: map['option'] ?? 'Al menos',
-      goal: map['goal'] ?? 0,
-      current: map['current'] ?? 0,
-      amount: map['amount'] ?? 0,
-      days: List<int>.from(map['days'] ?? [0, 0, 0, 0, 0, 0, 0]),
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      goal: goalValue,
+      current: currentValue,
+      amount: map['amount'] is int ? map['amount'] : 1,
+      days: daysList,
+      createdAt: map['createdAt'] != null 
+          ? DateTime.parse(map['createdAt']) 
+          : DateTime.now(),
     );
   }
 
-  // Calcular el porcentaje de progreso
-  double getProgressPercentage() {
-    if (type == 'boolean') {
-      return current == true ? 1.0 : 0.0;
-    } else if (type == 'count') {
-      if (goal == 0) return 0.0;
-      return (current / goal).clamp(0.0, 1.0);
-    } else if (type == 'time') {
-      // Convertir tiempo a minutos para comparar
-      final goalMinutes = _convertTimeToMinutes(goal.toString());
-      final currentMinutes = _convertTimeToMinutes(current.toString());
-      if (goalMinutes == 0) return 0.0;
-      return (currentMinutes / goalMinutes).clamp(0.0, 1.0);
-    }
-    return 0.0;
-  }
+  // Crear Habit desde JSON
+  factory Habit.fromJson(String source) => Habit.fromMap(json.decode(source));
 
-  // Convertir formato de tiempo (HH:MM:SS) a minutos
-  int _convertTimeToMinutes(String time) {
-    try {
-      final parts = time.split(':');
-      if (parts.length >= 3) {
-        final hours = int.tryParse(parts[0]) ?? 0;
-        final minutes = int.tryParse(parts[1]) ?? 0;
-        final seconds = int.tryParse(parts[2]) ?? 0;
-        return hours * 60 + minutes + (seconds > 0 ? 1 : 0);
-      }
-    } catch (e) {
-      print('Error al convertir tiempo: $e');
-    }
-    return 0;
-  }
-
-  // Verificar si el hábito está completado para el día actual
-  bool isCompletedToday() {
-    final today = DateTime.now().weekday % 7; // 0-6 (0 = domingo)
-    return days[today] == 2;
-  }
-
-  // Verificar si el hábito está parcialmente completado para el día actual
-  bool isPartiallyCompletedToday() {
-    final today = DateTime.now().weekday % 7;
-    return days[today] == 1;
+  // Crear una copia de Habit con algunos campos actualizados
+  Habit copyWith({
+    String? id,
+    String? name,
+    String? description,
+    String? category,
+    String? type,
+    String? option,
+    dynamic goal,
+    dynamic current,
+    int? amount,
+    List<int>? days,
+    DateTime? createdAt,
+  }) {
+    return Habit(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      category: category ?? this.category,
+      type: type ?? this.type,
+      option: option ?? this.option,
+      goal: goal ?? this.goal,
+      current: current ?? this.current,
+      amount: amount ?? this.amount,
+      days: days ?? List<int>.from(this.days),
+      createdAt: createdAt ?? this.createdAt,
+    );
   }
 }

@@ -1,104 +1,92 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
 
 class Hobby {
   final String id;
   final String name;
   final String icon;
-  final String category;
-  final String time; // Tiempo total registrado
-  final String weeklyGoal; // Meta semanal
-  final List<Map<String, dynamic>> registeredTimes; // Lista de tiempos registrados
-  final List<int> activeDays; // Días con actividad (0-6, donde 0 es domingo)
-  final DateTime createdAt;
+  String time;
+  final String weeklyGoal;
+  final List<Map<String, dynamic>> registeredTimes;
+  final List<int> activeDays;
 
   Hobby({
     required this.id,
     required this.name,
     required this.icon,
-    required this.category,
     this.time = '00:00:00',
-    this.weeklyGoal = '05:00:00',
+    required this.weeklyGoal,
     required this.registeredTimes,
     required this.activeDays,
-    required this.createdAt,
   });
 
-  // Convertir a Map para Firebase
+  // Convertir Hobby a Map
   Map<String, dynamic> toMap() {
     return {
       'id': id,
       'name': name,
       'icon': icon,
-      'category': category,
       'time': time,
       'weeklyGoal': weeklyGoal,
-      'registeredTimes': registeredTimes,
+      'registeredTimes': registeredTimes.map((timeEntry) {
+        final Map<String, dynamic> serializedEntry = Map.from(timeEntry);
+        if (serializedEntry['date'] is DateTime) {
+          serializedEntry['date'] = (serializedEntry['date'] as DateTime).toIso8601String();
+        }
+        return serializedEntry;
+      }).toList(),
       'activeDays': activeDays,
-      'createdAt': Timestamp.fromDate(createdAt),
     };
   }
 
-  // Crear desde Map de Firebase
+  // Convertir Hobby a JSON
+  String toJson() => jsonEncode(toMap());
+
+  // Crear Hobby desde Map
   factory Hobby.fromMap(Map<String, dynamic> map) {
-    List<Map<String, dynamic>> times = [];
+    // Procesar registeredTimes
+    List<Map<String, dynamic>> processedTimes = [];
     if (map['registeredTimes'] != null) {
-      times = List<Map<String, dynamic>>.from(
-        map['registeredTimes'].map((x) => Map<String, dynamic>.from(x)),
-      );
+      processedTimes = (map['registeredTimes'] as List).map((timeEntry) {
+        final Map<String, dynamic> entry = Map<String, dynamic>.from(timeEntry);
+        if (entry['date'] is String) {
+          entry['date'] = DateTime.parse(entry['date']);
+        }
+        return entry;
+      }).cast<Map<String, dynamic>>().toList();
     }
 
     return Hobby(
-      id: map['id'] ?? '',
+      id: map['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
       name: map['name'] ?? '',
       icon: map['icon'] ?? '😊',
-      category: map['category'] ?? 'Música',
       time: map['time'] ?? '00:00:00',
       weeklyGoal: map['weeklyGoal'] ?? '05:00:00',
-      registeredTimes: times,
+      registeredTimes: processedTimes,
       activeDays: List<int>.from(map['activeDays'] ?? []),
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 
-  // Calcular el porcentaje de progreso hacia la meta semanal
-  double getProgressPercentage() {
-    // Convertir tiempo a minutos para comparar
-    final goalMinutes = _convertTimeToMinutes(weeklyGoal);
-    final currentMinutes = _convertTimeToMinutes(time);
-    if (goalMinutes == 0) return 0.0;
-    return (currentMinutes / goalMinutes).clamp(0.0, 1.0);
-  }
+  // Crear Hobby desde JSON
+  factory Hobby.fromJson(String source) => Hobby.fromMap(jsonDecode(source));
 
-  // Convertir formato de tiempo (HH:MM:SS) a minutos
-  int _convertTimeToMinutes(String time) {
-    try {
-      final parts = time.split(':');
-      if (parts.length >= 3) {
-        final hours = int.tryParse(parts[0]) ?? 0;
-        final minutes = int.tryParse(parts[1]) ?? 0;
-        final seconds = int.tryParse(parts[2]) ?? 0;
-        return hours * 60 + minutes + (seconds > 0 ? 1 : 0);
-      }
-    } catch (e) {
-      print('Error al convertir tiempo: $e');
-    }
-    return 0;
-  }
-
-  // Verificar si el hobby tiene actividad registrada para el día actual
-  bool hasActivityToday() {
-    final today = DateTime.now().weekday % 7; // 0-6 (0 = domingo)
-    return activeDays.contains(today);
-  }
-
-  // Obtener el tiempo registrado para una fecha específica
-  String getTimeForDate(DateTime date) {
-    final dateString = '${date.year}-${date.month}-${date.day}';
-    for (var entry in registeredTimes) {
-      if (entry['date'] == dateString) {
-        return entry['time'] ?? '00:00:00';
-      }
-    }
-    return '00:00:00';
+  // Crear una copia del Hobby con cambios
+  Hobby copyWith({
+    String? id,
+    String? name,
+    String? icon,
+    String? time,
+    String? weeklyGoal,
+    List<Map<String, dynamic>>? registeredTimes,
+    List<int>? activeDays,
+  }) {
+    return Hobby(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      icon: icon ?? this.icon,
+      time: time ?? this.time,
+      weeklyGoal: weeklyGoal ?? this.weeklyGoal,
+      registeredTimes: registeredTimes ?? this.registeredTimes,
+      activeDays: activeDays ?? this.activeDays,
+    );
   }
 }
