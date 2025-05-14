@@ -2,14 +2,15 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/habit.dart';
 import '../models/task.dart';
+import '../models/hobby.dart';
 
 class LocalStorageService {
   static const String _habitsKey = 'habits';
   static const String _tasksKey = 'tasks';
-  
-  // MÉTODOS PARA HÁBITOS
-  
-  // Guardar hábitos en SharedPreferences
+  static const String _hobbiesKey = 'hobbies';
+
+  // -------------------- MÉTODOS PARA HÁBITOS --------------------
+
   Future<void> saveHabits(List<Habit> habits) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -20,23 +21,19 @@ class LocalStorageService {
       throw Exception('No se pudieron guardar los hábitos: $e');
     }
   }
-  
-  // Obtener hábitos de SharedPreferences
+
   Future<List<Habit>> getHabits() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final habitsJson = prefs.getStringList(_habitsKey) ?? [];
-      
-      if (habitsJson.isEmpty) {
-        return [];
-      }
-      
+
+      if (habitsJson.isEmpty) return [];
+
       return habitsJson.map((json) {
         try {
           return Habit.fromJson(json);
         } catch (e) {
           print('Error al parsear hábito: $e');
-          // Devolver un hábito por defecto en caso de error
           return Habit(
             id: DateTime.now().millisecondsSinceEpoch.toString(),
             name: 'Hábito (error)',
@@ -53,68 +50,45 @@ class LocalStorageService {
       return [];
     }
   }
-  
-  // Obtener hábitos para un rango de fechas específico
+
   Future<List<Habit>> getHabitsForDateRange(DateTime startDate, DateTime endDate) async {
     try {
       final habits = await getHabits();
-      
-      // Filtrar hábitos creados dentro del rango de fechas o antes
       return habits.where((habit) {
-        // Incluir hábitos creados antes o durante el período
         return habit.createdAt.isBefore(endDate.add(const Duration(days: 1)));
       }).toList();
     } catch (e) {
-      print('Error al obtener hábitos para rango de fechas: $e');
+      print('Error al obtener hábitos por fecha: $e');
       return [];
     }
   }
-  
-  // Añadir un nuevo hábito
+
   Future<void> addHabit(Habit habit) async {
-    try {
-      final habits = await getHabits();
-      habits.add(habit);
-      await saveHabits(habits);
-    } catch (e) {
-      print('Error al añadir hábito: $e');
-      throw Exception('No se pudo añadir el hábito: $e');
-    }
+    final habits = await getHabits();
+    habits.add(habit);
+    await saveHabits(habits);
   }
-  
-  // Actualizar un hábito existente
+
   Future<void> updateHabit(Habit updatedHabit) async {
-    try {
-      final habits = await getHabits();
-      final index = habits.indexWhere((h) => h.id == updatedHabit.id);
-      
-      if (index != -1) {
-        habits[index] = updatedHabit;
-        await saveHabits(habits);
-      } else {
-        throw Exception('Hábito no encontrado');
-      }
-    } catch (e) {
-      print('Error al actualizar hábito: $e');
-      throw Exception('No se pudo actualizar el hábito: $e');
-    }
-  }
-  
-  // Eliminar un hábito
-  Future<void> deleteHabit(String habitId) async {
-    try {
-      final habits = await getHabits();
-      habits.removeWhere((h) => h.id == habitId);
+    final habits = await getHabits();
+    final index = habits.indexWhere((h) => h.id == updatedHabit.id);
+
+    if (index != -1) {
+      habits[index] = updatedHabit;
       await saveHabits(habits);
-    } catch (e) {
-      print('Error al eliminar hábito: $e');
-      throw Exception('No se pudo eliminar el hábito: $e');
+    } else {
+      throw Exception('Hábito no encontrado');
     }
   }
-  
-  // MÉTODOS PARA TAREAS
-  
-  // Guardar tareas en SharedPreferences
+
+  Future<void> deleteHabit(String habitId) async {
+    final habits = await getHabits();
+    habits.removeWhere((h) => h.id == habitId);
+    await saveHabits(habits);
+  }
+
+  // -------------------- MÉTODOS PARA TAREAS --------------------
+
   Future<void> saveTasks(List<Task> tasks) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -125,33 +99,20 @@ class LocalStorageService {
       throw Exception('No se pudieron guardar las tareas: $e');
     }
   }
-  
-  // Obtener tareas de SharedPreferences
+
   Future<List<Task>> getTasks() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final tasksJson = prefs.getStringList(_tasksKey) ?? [];
-      
-      if (tasksJson.isEmpty) {
-        return [];
-      }
-      
+
       return tasksJson.map((json) {
         try {
           final map = jsonDecode(json) as Map<String, dynamic>;
-          
-          // Convertir las fechas de string a DateTime
-          if (map['date'] is String) {
-            map['date'] = DateTime.parse(map['date']);
-          }
-          if (map['createdAt'] is String) {
-            map['createdAt'] = DateTime.parse(map['createdAt']);
-          }
-          
+          map['date'] = DateTime.parse(map['date']);
+          map['createdAt'] = DateTime.parse(map['createdAt']);
           return Task.fromMap(map);
         } catch (e) {
           print('Error al parsear tarea: $e');
-          // Devolver una tarea por defecto en caso de error
           return Task(
             id: DateTime.now().millisecondsSinceEpoch.toString(),
             title: 'Tarea (error)',
@@ -166,86 +127,123 @@ class LocalStorageService {
       return [];
     }
   }
-  
-  // Obtener tareas para un rango de fechas específico
+
   Future<List<Task>> getTasksForDateRange(DateTime startDate, DateTime endDate) async {
     try {
       final tasks = await getTasks();
-      
-      // Filtrar tareas dentro del rango de fechas
       return tasks.where((task) {
         final taskDate = DateTime(task.date.year, task.date.month, task.date.day);
         final start = DateTime(startDate.year, startDate.month, startDate.day);
         final end = DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
-        
         return taskDate.isAtSameMomentAs(start) || 
                taskDate.isAtSameMomentAs(end) || 
                (taskDate.isAfter(start) && taskDate.isBefore(end));
       }).toList();
     } catch (e) {
-      print('Error al obtener tareas para rango de fechas: $e');
+      print('Error al obtener tareas por fecha: $e');
       return [];
     }
   }
-  
-  // Añadir una nueva tarea
+
   Future<void> addTask(Task task) async {
-    try {
-      final tasks = await getTasks();
-      tasks.add(task);
-      await saveTasks(tasks);
-    } catch (e) {
-      print('Error al añadir tarea: $e');
-      throw Exception('No se pudo añadir la tarea: $e');
-    }
+    final tasks = await getTasks();
+    tasks.add(task);
+    await saveTasks(tasks);
   }
-  
-  // Actualizar una tarea existente
+
   Future<void> updateTask(Task updatedTask) async {
-    try {
-      final tasks = await getTasks();
-      final index = tasks.indexWhere((t) => t.id == updatedTask.id);
-      
-      if (index != -1) {
-        tasks[index] = updatedTask;
-        await saveTasks(tasks);
-      } else {
-        throw Exception('Tarea no encontrada');
-      }
-    } catch (e) {
-      print('Error al actualizar tarea: $e');
-      throw Exception('No se pudo actualizar la tarea: $e');
-    }
-  }
-  
-  // Eliminar una tarea
-  Future<void> deleteTask(String taskId) async {
-    try {
-      final tasks = await getTasks();
-      tasks.removeWhere((t) => t.id == taskId);
+    final tasks = await getTasks();
+    final index = tasks.indexWhere((t) => t.id == updatedTask.id);
+
+    if (index != -1) {
+      tasks[index] = updatedTask;
       await saveTasks(tasks);
-    } catch (e) {
-      print('Error al eliminar tarea: $e');
-      throw Exception('No se pudo eliminar la tarea: $e');
+    } else {
+      throw Exception('Tarea no encontrada');
     }
   }
-  
-  // Marcar tarea como completada
+
+  Future<void> deleteTask(String taskId) async {
+    final tasks = await getTasks();
+    tasks.removeWhere((t) => t.id == taskId);
+    await saveTasks(tasks);
+  }
+
   Future<void> toggleTaskCompletion(String taskId, bool isCompleted) async {
-    try {
-      final tasks = await getTasks();
-      final index = tasks.indexWhere((t) => t.id == taskId);
-      
-      if (index != -1) {
-        final task = tasks[index];
-        tasks[index] = task.copyWith(isCompleted: isCompleted);
-        await saveTasks(tasks);
-      } else {
-        throw Exception('Tarea no encontrada');
-      }
-    } catch (e) {
-      print('Error al cambiar estado de tarea: $e');
-      throw Exception('No se pudo cambiar el estado de la tarea: $e');
+    final tasks = await getTasks();
+    final index = tasks.indexWhere((t) => t.id == taskId);
+
+    if (index != -1) {
+      final task = tasks[index];
+      tasks[index] = task.copyWith(isCompleted: isCompleted);
+      await saveTasks(tasks);
+    } else {
+      throw Exception('Tarea no encontrada');
     }
+  }
+
+  // -------------------- MÉTODOS PARA HOBBIES --------------------
+
+  Future<void> saveHobbies(List<Hobby> hobbies) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final hobbiesJson = hobbies.map((hobby) => hobby.toJson()).toList();
+      await prefs.setStringList(_hobbiesKey, hobbiesJson);
+      print('Hobbies guardados: ${hobbiesJson.length}');
+    } catch (e) {
+      print('Error al guardar hobbies: $e');
+      throw Exception('No se pudieron guardar los hobbies: $e');
+    }
+  }
+
+  Future<List<Hobby>> getHobbies() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final hobbiesJson = prefs.getStringList(_hobbiesKey) ?? [];
+
+      return hobbiesJson.map((json) {
+        try {
+          return Hobby.fromJson(json);
+        } catch (e) {
+          print('Error al parsear hobby: $e');
+          return Hobby(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            name: 'Hobby (error)',
+            icon: '😊',
+            time: '00:00:00',
+            weeklyGoal: '05:00:00',
+            registeredTimes: [],
+            activeDays: [],
+          );
+        }
+      }).toList();
+    } catch (e) {
+      print('Error al obtener hobbies: $e');
+      return [];
+    }
+  }
+
+  Future<void> addHobby(Hobby hobby) async {
+    final hobbies = await getHobbies();
+    hobbies.add(hobby);
+    await saveHobbies(hobbies);
+  }
+
+  Future<void> updateHobby(Hobby updatedHobby) async {
+    final hobbies = await getHobbies();
+    final index = hobbies.indexWhere((h) => h.id == updatedHobby.id);
+
+    if (index != -1) {
+      hobbies[index] = updatedHobby;
+      await saveHobbies(hobbies);
+    } else {
+      throw Exception('Hobby no encontrado');
+    }
+  }
+
+  Future<void> deleteHobby(String hobbyId) async {
+    final hobbies = await getHobbies();
+    hobbies.removeWhere((h) => h.id == hobbyId);
+    await saveHobbies(hobbies);
   }
 }
