@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import 'habit_form_screen.dart';
+import '../models/habit.dart';
+import '../services/local_storage_service.dart';
+import '../screens/habit_form_screen.dart';
+import 'dart:math' as math;
 
 class HabitsScreen extends StatefulWidget {
   const HabitsScreen({super.key});
@@ -9,79 +12,187 @@ class HabitsScreen extends StatefulWidget {
 }
 
 class _HabitsScreenState extends State<HabitsScreen> {
-  // Lista de hábitos
-  final List<Map<String, dynamic>> _habits = [
-    {
-      'name': 'Salir a correr',
-      'category': 'Ejercicio',
-      'type': 'count',
-      'option': 'Al menos',
-      'goal': 30,
-      'amount': 5,
-      'current': 0,
-      'description': 'Correr al menos 30 minutos diarios',
-      'days': [
-        0,
-        1,
-        2,
-        1,
-        0,
-        1,
-        0,
-      ], // 0: no registrado, 1: parcial, 2: completado
-    },
-  ];
+  final LocalStorageService _storageService = LocalStorageService();
+  List<Habit> _habits = [];
+  bool _isLoading = true;
+  bool _hasError = false;
+  String _errorMessage = '';
 
-  void _incrementHabit(int index) {
-    setState(() {
-      if (_habits[index]['current'] < _habits[index]['goal']) {
-        _habits[index]['current']++;
-
-        // Actualizar el estado del día actual (usamos 0 para domingo, 6 para sábado)
-        final today = DateTime.now().weekday % 7; // 0-6 (0 = domingo)
-
-        // Determinar el estado basado en el progreso
-        if (_habits[index]['current'] >= _habits[index]['goal']) {
-          _habits[index]['days'][today] = 2; // Completado (verde)
-        } else if (_habits[index]['current'] > 0) {
-          _habits[index]['days'][today] = 1; // Parcial (amarillo)
-        }
-      }
-    });
+  @override
+  void initState() {
+    super.initState();
+    _loadHabits();
   }
 
-  void _decrementHabit(int index) {
+  Future<void> _loadHabits() async {
     setState(() {
-      if (_habits[index]['current'] > 0) {
-        _habits[index]['current']--;
+      _isLoading = true;
+      _hasError = false;
+    });
 
+    try {
+      final habits = await _storageService.getHabits();
+      
+      if (mounted) {
+        setState(() {
+          _habits = habits;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error al cargar hábitos: $e');
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _errorMessage = 'Error al cargar hábitos: $e';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _incrementHabit(int index) async {
+    if (index < 0 || index >= _habits.length) return;
+    
+    try {
+      final habit = _habits[index];
+      
+      if (habit.type == 'count') {
+        final current = habit.current is int ? habit.current as int : 0;
+        final goal = habit.goal is int ? habit.goal as int : 0;
+        
+        if (goal == 0 || current < goal) {
+          // Crear una copia del hábito con el valor actualizado
+          final updatedDays = List<int>.from(habit.days);
+          final today = DateTime.now().weekday % 7;
+          
+          // Actualizar el estado del día actual
+          if (goal > 0 && current + 1 >= goal) {
+            updatedDays[today] = 2; // Completado
+          } else {
+            updatedDays[today] = 1; // Parcial
+          }
+          
+          final updatedHabit = habit.copyWith(
+            current: current + 1,
+            days: updatedDays,
+          );
+          
+          // Actualizar la UI primero
+          setState(() {
+            _habits[index] = updatedHabit;
+          });
+          
+          // Guardar en almacenamiento local
+          await _storageService.updateHabit(updatedHabit);
+        }
+      }
+    } catch (e) {
+      print('Error al incrementar hábito: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al actualizar: $e')),
+        );
+      }
+    }
+  }
+
+  void _decrementHabit(int index) async {
+    if (index < 0 || index >= _habits.length) return;
+    
+    try {
+      final habit = _habits[index];
+      
+      if (habit.type == 'count') {
+        final current = habit.current is int ? habit.current as int : 0;
+        
+        if (current > 0) {
+          // Crear una copia del hábito con el valor actualizado
+          final updatedDays = List<int>.from(habit.days);
+          final today = DateTime.now().weekday % 7;
+          final goal = habit.goal is int ? habit.goal as int : 0;
+          
+          // Actualizar el estado del día actual
+          if (current - 1 <= 0) {
+            updatedDays[today] = 0; // No registrado
+          } else if (goal > 0 && current - 1 < goal) {
+            updatedDays[today] = 1; // Parcial
+          }
+          
+          final updatedHabit = habit.copyWith(
+            current: current - 1,
+            days: updatedDays,
+          );
+          
+          // Actualizar la UI primero
+          setState(() {
+            _habits[index] = updatedHabit;
+          });
+          
+          // Guardar en almacenamiento local
+          await _storageService.updateHabit(updatedHabit);
+        }
+      }
+    } catch (e) {
+      print('Error al decrementar hábito: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al actualizar: $e')),
+        );
+      }
+    }
+  }
+
+  void _toggleBooleanHabit(int index) async {
+    if (index < 0 || index >= _habits.length) return;
+    
+    try {
+      final habit = _habits[index];
+      
+      if (habit.type == 'boolean') {
+        final current = habit.current is bool ? habit.current as bool : false;
+        
+        // Crear una copia del hábito con el valor actualizado
+        final updatedDays = List<int>.from(habit.days);
+        final today = DateTime.now().weekday % 7;
+        
         // Actualizar el estado del día actual
-        final today = DateTime.now().weekday % 7; // 0-6 (0 = domingo)
-
-        // Determinar el estado basado en el progreso
-        if (_habits[index]['current'] <= 0) {
-          _habits[index]['days'][today] = 0; // No registrado (rojo)
-        } else if (_habits[index]['current'] < _habits[index]['goal']) {
-          _habits[index]['days'][today] = 1; // Parcial (amarillo)
-        }
+        updatedDays[today] = !current ? 2 : 0; // 2 = completado, 0 = no registrado
+        
+        final updatedHabit = habit.copyWith(
+          current: !current,
+          days: updatedDays,
+        );
+        
+        // Actualizar la UI primero
+        setState(() {
+          _habits[index] = updatedHabit;
+        });
+        
+        // Guardar en almacenamiento local
+        await _storageService.updateHabit(updatedHabit);
       }
-    });
-  }
-
-  void _toggleBooleanHabit(int index) {
-    setState(() {
-      _habits[index]['current'] = !_habits[index]['current'];
-
-      // Actualizar el estado del día actual
-      final today = DateTime.now().weekday % 7;
-      _habits[index]['days'][today] = _habits[index]['current'] ? 2 : 0;
-    });
+    } catch (e) {
+      print('Error al cambiar hábito booleano: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al actualizar: $e')),
+        );
+      }
+    }
   }
 
   void _showRegisterTimeDialog(int index) {
-    int hours = 0;
-    int minutes = 0;
-    int seconds = 0;
+    if (index < 0 || index >= _habits.length) return;
+    
+    final habit = _habits[index];
+    String currentTime = habit.current is String ? habit.current as String : '00:00:00';
+    
+    // Extraer horas, minutos y segundos del tiempo actual
+    List<String> timeParts = currentTime.split(':');
+    int hours = int.tryParse(timeParts[0]) ?? 0;
+    int minutes = int.tryParse(timeParts[1]) ?? 0;
+    int seconds = int.tryParse(timeParts[2]) ?? 0;
 
     showDialog(
       context: context,
@@ -216,23 +327,58 @@ class _HabitsScreenState extends State<HabitsScreen> {
               child: const Text('Cancelar'),
             ),
             TextButton(
-              onPressed: () {
-                // Actualizar el tiempo del hábito
-                final newTime =
-                    '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-                setState(() {
-                  _habits[index]['current'] = newTime;
-
-                  // Actualizar el estado del día actual
+              onPressed: () async {
+                try {
+                  // Actualizar el tiempo del hábito
+                  final newTime =
+                      '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+                  
+                  // Crear una copia del hábito con el valor actualizado
+                  final updatedDays = List<int>.from(habit.days);
                   final today = DateTime.now().weekday % 7;
-
+                  final goalTime = habit.goal is String ? habit.goal as String : '00:00:00';
+                  
                   // Determinar el estado basado en el progreso
                   if (hours > 0 || minutes > 0 || seconds > 0) {
-                    _habits[index]['days'][today] =
-                        1; // Al menos se registró algo
+                    // Comparar con el objetivo
+                    List<String> goalParts = goalTime.split(':');
+                    int goalHours = int.tryParse(goalParts[0]) ?? 0;
+                    int goalMinutes = int.tryParse(goalParts[1]) ?? 0;
+                    int goalSeconds = int.tryParse(goalParts[2]) ?? 0;
+                    
+                    int totalSeconds = hours * 3600 + minutes * 60 + seconds;
+                    int goalTotalSeconds = goalHours * 3600 + goalMinutes * 60 + goalSeconds;
+                    
+                    if (totalSeconds >= goalTotalSeconds && goalTotalSeconds > 0) {
+                      updatedDays[today] = 2; // Completado
+                    } else {
+                      updatedDays[today] = 1; // Parcial
+                    }
+                  } else {
+                    updatedDays[today] = 0; // No registrado
                   }
-                });
-                Navigator.of(context).pop();
+                  
+                  final updatedHabit = habit.copyWith(
+                    current: newTime,
+                    days: updatedDays,
+                  );
+                  
+                  // Actualizar la UI primero
+                  setState(() {
+                    _habits[index] = updatedHabit;
+                  });
+                  
+                  // Guardar en almacenamiento local
+                  await _storageService.updateHabit(updatedHabit);
+                  
+                  Navigator.of(context).pop();
+                } catch (e) {
+                  print('Error al guardar tiempo: $e');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error al guardar: $e')),
+                  );
+                  Navigator.of(context).pop();
+                }
               },
               child: const Text('Guardar'),
             ),
@@ -242,24 +388,64 @@ class _HabitsScreenState extends State<HabitsScreen> {
     );
   }
 
-  void _editHabit(int index) {
-    Navigator.push(
+  Future<void> _showAddHabitScreen() async {
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder:
-            (context) =>
-                HabitFormScreen(habit: _habits[index], isEditing: true),
+        builder: (context) => const HabitFormScreen(),
       ),
-    ).then((updatedHabit) {
-      if (updatedHabit != null) {
-        setState(() {
-          _habits[index] = updatedHabit;
-        });
+    );
+    
+    if (result != null && result is Habit) {
+      try {
+        await _storageService.addHabit(result);
+        _loadHabits();
+      } catch (e) {
+        print('Error al añadir hábito: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al guardar: $e')),
+          );
+        }
       }
-    });
+    }
+  }
+
+  Future<void> _editHabit(int index) async {
+    if (index < 0 || index >= _habits.length) return;
+    
+    final habit = _habits[index];
+    
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => HabitFormScreen(
+          habit: habit,
+          isEditing: true,
+        ),
+      ),
+    );
+    
+    if (result != null && result is Habit) {
+      try {
+        await _storageService.updateHabit(result);
+        _loadHabits();
+      } catch (e) {
+        print('Error al actualizar hábito: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al guardar: $e')),
+          );
+        }
+      }
+    }
   }
 
   void _deleteHabit(int index) {
+    if (index < 0 || index >= _habits.length) return;
+    
+    final habit = _habits[index];
+    
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -276,11 +462,27 @@ class _HabitsScreenState extends State<HabitsScreen> {
               child: const Text('Cancelar'),
             ),
             TextButton(
-              onPressed: () {
-                setState(() {
-                  _habits.removeAt(index);
-                });
-                Navigator.pop(context);
+              onPressed: () async {
+                try {
+                  // Eliminar de la UI primero
+                  setState(() {
+                    _habits.removeAt(index);
+                  });
+                  
+                  // Eliminar del almacenamiento local
+                  await _storageService.deleteHabit(habit.id);
+                  
+                  Navigator.pop(context);
+                } catch (e) {
+                  print('Error al eliminar hábito: $e');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error al eliminar: $e')),
+                  );
+                  Navigator.pop(context);
+                  
+                  // Recargar hábitos en caso de error
+                  _loadHabits();
+                }
               },
               style: TextButton.styleFrom(foregroundColor: Colors.red),
               child: const Text('Eliminar'),
@@ -296,180 +498,189 @@ class _HabitsScreenState extends State<HabitsScreen> {
     return Scaffold(
       body: Container(
         color: const Color(0xFFE0FFFF),
-        child:
-            _habits.isEmpty
-                ? const Center(
-                  child: Text(
-                    'No hay hábitos registrados.\nPresiona el botón + para agregar uno.',
-                    textAlign: TextAlign.center,
-                  ),
-                )
-                : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _habits.length,
-                  itemBuilder: (context, index) {
-                    final habit = _habits[index];
-                    final habitType = habit['type'] ?? 'count';
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _hasError
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Ocurrió un error',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _errorMessage,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _loadHabits,
+                          child: const Text('Reintentar'),
+                        ),
+                      ],
+                    ),
+                  )
+                : _habits.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'No hay hábitos registrados.\nPresiona el botón + para agregar uno.',
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _habits.length,
+                        itemBuilder: (context, index) {
+                          final habit = _habits[index];
+                          final habitType = habit.type;
 
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      color: const Color(0xFFB3E5FC), // Color azul claro
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: InkWell(
-                        onTap: () => _editHabit(index),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    habit['name'],
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  Row(
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.edit),
-                                        onPressed: () => _editHabit(index),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.delete),
-                                        onPressed: () => _deleteHabit(index),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 8,
-                                  horizontal: 16,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceEvenly,
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            color: const Color(0xFFB3E5FC), // Color azul claro
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: InkWell(
+                              onTap: () => _editHabit(index),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Column(
                                   children: [
-                                    _buildDayCircle('D', habit['days'][0]),
-                                    _buildDayCircle('L', habit['days'][1]),
-                                    _buildDayCircle('M', habit['days'][2]),
-                                    _buildDayCircle('X', habit['days'][3]),
-                                    _buildDayCircle('J', habit['days'][4]),
-                                    _buildDayCircle('V', habit['days'][5]),
-                                    _buildDayCircle('S', habit['days'][6]),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  // Mostrar progreso según el tipo de hábito
-                                  if (habitType == 'count') ...[
-                                    Text(
-                                      '${habit['current']}/${habit['goal']}',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
                                     Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
-                                        IconButton(
-                                          icon: const Icon(
-                                            Icons.remove_circle_outline,
+                                        Expanded(
+                                          child: Text(
+                                            habit.name,
+                                            style: const TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                          onPressed:
-                                              () => _decrementHabit(index),
                                         ),
                                         IconButton(
-                                          icon: const Icon(
-                                            Icons.add_circle_outline,
-                                          ),
-                                          onPressed:
-                                              () => _incrementHabit(index),
+                                          icon: const Icon(Icons.delete),
+                                          onPressed: () => _deleteHabit(index),
                                         ),
                                       ],
                                     ),
-                                  ] else if (habitType == 'time') ...[
-                                    Text(
-                                      '${habit['current']}/${habit['goal']}',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
+                                    const SizedBox(height: 16),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                        horizontal: 16,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceEvenly,
+                                        children: [
+                                          _buildDayCircle('D', habit.days.length > 0 ? habit.days[0] : 0),
+                                          _buildDayCircle('L', habit.days.length > 1 ? habit.days[1] : 0),
+                                          _buildDayCircle('M', habit.days.length > 2 ? habit.days[2] : 0),
+                                          _buildDayCircle('X', habit.days.length > 3 ? habit.days[3] : 0),
+                                          _buildDayCircle('J', habit.days.length > 4 ? habit.days[4] : 0),
+                                          _buildDayCircle('V', habit.days.length > 5 ? habit.days[5] : 0),
+                                          _buildDayCircle('S', habit.days.length > 6 ? habit.days[6] : 0),
+                                        ],
                                       ),
                                     ),
-                                    IconButton(
-                                      icon: const Icon(Icons.timer),
-                                      onPressed:
-                                          () => _showRegisterTimeDialog(index),
-                                    ),
-                                  ] else if (habitType == 'boolean') ...[
-                                    Text(
-                                      habit['current']
-                                          ? 'Completado'
-                                          : 'Pendiente',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color:
-                                            habit['current']
-                                                ? Colors.green
-                                                : Colors.red,
-                                      ),
-                                    ),
-                                    IconButton(
-                                      icon: Icon(
-                                        habit['current']
-                                            ? Icons.check_circle
-                                            : Icons.check_circle_outline,
-                                        color:
-                                            habit['current']
-                                                ? Colors.green
-                                                : Colors.grey,
-                                      ),
-                                      onPressed:
-                                          () => _toggleBooleanHabit(index),
+                                    const SizedBox(height: 16),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        // Mostrar progreso según el tipo de hábito
+                                        if (habitType == 'count') ...[
+                                          Text(
+                                            '${habit.current}/${habit.goal}',
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          Row(
+                                            children: [
+                                              IconButton(
+                                                icon: const Icon(
+                                                  Icons.remove_circle_outline,
+                                                ),
+                                                onPressed:
+                                                    () => _decrementHabit(index),
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(
+                                                  Icons.add_circle_outline,
+                                                ),
+                                                onPressed:
+                                                    () => _incrementHabit(index),
+                                              ),
+                                            ],
+                                          ),
+                                        ] else if (habitType == 'time') ...[
+                                          Text(
+                                            '${habit.current}/${habit.goal}',
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.timer),
+                                            onPressed:
+                                                () => _showRegisterTimeDialog(index),
+                                          ),
+                                        ] else if (habitType == 'boolean') ...[
+                                          Text(
+                                            habit.current == true
+                                                ? 'Completado'
+                                                : 'Pendiente',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color:
+                                                  habit.current == true
+                                                      ? Colors.green
+                                                      : Colors.red,
+                                            ),
+                                          ),
+                                          IconButton(
+                                            icon: Icon(
+                                              habit.current == true
+                                                  ? Icons.check_circle
+                                                  : Icons.check_circle_outline,
+                                              color:
+                                                  habit.current == true
+                                                      ? Colors.green
+                                                      : Colors.grey,
+                                            ),
+                                            onPressed:
+                                                () => _toggleBooleanHabit(index),
+                                          ),
+                                        ],
+                                      ],
                                     ),
                                   ],
-                                ],
+                                ),
                               ),
-                            ],
-                          ),
-                        ),
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: const Color(0xFF0D47A1),
-        onPressed: () {
-          // Navegar a la pantalla de creación de hábito
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const HabitFormScreen()),
-          ).then((newHabit) {
-            if (newHabit != null) {
-              setState(() {
-                _habits.add(newHabit);
-              });
-            }
-          });
-        },
+        onPressed: _showAddHabitScreen,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../widgets/category_dialog.dart';
+import '../models/habit.dart';
 
 class HabitFormScreen extends StatefulWidget {
-  final Map<String, dynamic>? habit;
+  final Habit? habit;
   final bool isEditing;
 
   const HabitFormScreen({
@@ -37,6 +38,9 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
     'Educación',
     'Trabajo',
     'Personal',
+    'Finanzas',
+    'Hobbies',
+    'Otros',
   ];
   
   final List<String> _options = [
@@ -52,23 +56,25 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
     
     // Si estamos editando, cargar los datos del hábito
     if (widget.isEditing && widget.habit != null) {
-      _titleController.text = widget.habit!['name'] ?? '';
-      _descriptionController.text = widget.habit!['description'] ?? '';
-      _selectedCategory = widget.habit!['category'] ?? 'Ejercicio';
-      _selectedType = widget.habit!['type'] ?? 'count';
+      _titleController.text = widget.habit!.name;
+      _descriptionController.text = widget.habit!.description;
+      _selectedCategory = widget.habit!.category;
+      _selectedType = widget.habit!.type;
       
       if (_selectedType == 'count') {
-        _selectedOption = widget.habit!['option'] ?? 'Al menos';
-        _goalController.text = widget.habit!['goal']?.toString() ?? '';
-        _amountController.text = widget.habit!['amount']?.toString() ?? '';
+        _selectedOption = widget.habit!.option;
+        if (widget.habit!.goal != null && widget.habit!.goal is int) {
+          _goalController.text = (widget.habit!.goal as int).toString();
+        }
+        _amountController.text = widget.habit!.amount.toString();
         _isGoalEnabled = _selectedOption != 'Sin objetivo';
       } else if (_selectedType == 'time') {
-        _selectedOption = widget.habit!['option'] ?? 'Al menos';
+        _selectedOption = widget.habit!.option;
         _isGoalEnabled = _selectedOption != 'Sin objetivo';
         
         // Cargar el tiempo si existe
-        if (widget.habit!['goal'] != null && widget.habit!['goal'] is String) {
-          final timeParts = widget.habit!['goal'].split(':');
+        if (widget.habit!.goal != null && widget.habit!.goal is String) {
+          final timeParts = (widget.habit!.goal as String).split(':');
           if (timeParts.length == 3) {
             _hours = int.tryParse(timeParts[0]) ?? 0;
             _minutes = int.tryParse(timeParts[1]) ?? 0;
@@ -652,44 +658,43 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
                           return;
                         }
                         
-                        // Crear el hábito según su tipo
-                        Map<String, dynamic> newHabit;
+                        // Preparar valores según el tipo
+                        dynamic goalValue;
+                        dynamic currentValue;
                         
                         if (_selectedType == 'count') {
-                          newHabit = {
-                            'name': _titleController.text,
-                            'category': _selectedCategory,
-                            'type': 'count',
-                            'option': _selectedOption,
-                            'goal': _isGoalEnabled ? int.tryParse(_goalController.text) ?? 0 : 0,
-                            'amount': int.tryParse(_amountController.text) ?? 0,
-                            'description': _descriptionController.text,
-                            'current': 0,
-                            'days': [0, 0, 0, 0, 0, 0, 0],
-                          };
+                          goalValue = _isGoalEnabled ? int.tryParse(_goalController.text) ?? 0 : 0;
+                          currentValue = widget.isEditing && widget.habit?.type == 'count' 
+                              ? widget.habit!.current 
+                              : 0;
                         } else if (_selectedType == 'time') {
-                          newHabit = {
-                            'name': _titleController.text,
-                            'category': _selectedCategory,
-                            'type': 'time',
-                            'option': _selectedOption,
-                            'goal': _isGoalEnabled ? _formattedTime : '00:00:00',
-                            'description': _descriptionController.text,
-                            'current': '00:00:00',
-                            'days': [0, 0, 0, 0, 0, 0, 0],
-                          };
+                          goalValue = _isGoalEnabled ? _formattedTime : '00:00:00';
+                          currentValue = widget.isEditing && widget.habit?.type == 'time' 
+                              ? widget.habit!.current 
+                              : '00:00:00';
                         } else { // boolean
-                          newHabit = {
-                            'name': _titleController.text,
-                            'category': _selectedCategory,
-                            'type': 'boolean',
-                            'description': _descriptionController.text,
-                            'current': false, // No completado inicialmente
-                            'days': [0, 0, 0, 0, 0, 0, 0],
-                          };
+                          goalValue = null;
+                          currentValue = widget.isEditing && widget.habit?.type == 'boolean' 
+                              ? widget.habit!.current 
+                              : false;
                         }
                         
-                        Navigator.pop(context, newHabit);
+                        // Crear o actualizar el hábito
+                        final habit = Habit(
+                          id: widget.isEditing ? widget.habit!.id : DateTime.now().millisecondsSinceEpoch.toString(),
+                          name: _titleController.text,
+                          description: _descriptionController.text,
+                          category: _selectedCategory,
+                          type: _selectedType,
+                          option: _selectedType == 'boolean' ? 'Sin objetivo' : _selectedOption,
+                          goal: goalValue,
+                          current: currentValue,
+                          amount: int.tryParse(_amountController.text) ?? 1,
+                          days: widget.isEditing ? widget.habit!.days : [0, 0, 0, 0, 0, 0, 0],
+                          createdAt: widget.isEditing ? widget.habit!.createdAt : DateTime.now(),
+                        );
+                        
+                        Navigator.pop(context, habit);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,

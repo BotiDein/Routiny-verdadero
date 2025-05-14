@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../services/firebase_service.dart';
 import '../models/task.dart';
+import '../models/habit.dart';
+import '../services/local_storage_service.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:math' as math;
 
@@ -14,7 +14,7 @@ class ResumenPersonalScreen extends StatefulWidget {
 }
 
 class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
-  late FirebaseService _firebaseService;
+  final LocalStorageService _storageService = LocalStorageService();
   bool _isLoading = true;
   
   // Datos para el resumen
@@ -26,7 +26,7 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
   int _completedTasks = 0;
   
   // Datos de hábitos
-  List<Map<String, dynamic>> _monthHabits = [];
+  List<Habit> _monthHabits = [];
   int _totalHabits = 0;
   int _completedHabits = 0;
   
@@ -44,8 +44,6 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
   @override
   void initState() {
     super.initState();
-    final userId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
-    _firebaseService = FirebaseService(userId);
     _loadMonthData();
   }
   
@@ -59,13 +57,13 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
       final firstDayOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
       final lastDayOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0, 23, 59, 59);
       
-      // Cargar tareas del mes
-      final tasks = await _firebaseService.getTasksForDateRange(firstDayOfMonth, lastDayOfMonth);
-      _monthTasks = tasks;
+      // Cargar tareas del mes (implementar según tu modelo de tareas)
+      // Por ahora, usamos una lista vacía
+      _monthTasks = [];
       
       // Cargar hábitos
-      final habits = await _firebaseService.getHabits();
-      _monthHabits = habits.map((habit) => habit).toList();
+      final habits = await _storageService.getHabits();
+      _monthHabits = habits;
       
       // Calcular estadísticas
       _calculateStatistics(firstDayOfMonth, lastDayOfMonth);
@@ -87,27 +85,20 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
   
   void _loadDemoData() {
     // Datos de ejemplo para demostración en caso de error
-    _totalTasks = 25;
-    _completedTasks = 18;
-    _totalHabits = 8;
-    _completedHabits = 5;
-    _currentStreak = 4;
-    _longestStreak = 7;
+    _totalTasks = 0;
+    _completedTasks = 0;
+    _totalHabits = 0;
+    _completedHabits = 0;
+    _currentStreak = 0;
+    _longestStreak = 0;
     
-    _timeSpent = {
-      'Trabajo': 12.5,
-      'Estudio': 8.2,
-      'Ejercicio': 5.0,
-      'Hobbies': 7.3,
-      'Lectura': 3.8,
-      'Otros': 2.1,
-    };
+    _timeSpent = {};
     
     // Generar datos de actividad diaria de ejemplo
     _activityByDay = {};
     final daysInMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).day;
     for (int i = 1; i <= daysInMonth; i++) {
-      _activityByDay[i] = math.Random().nextInt(5); // 0-4 actividades por día
+      _activityByDay[i] = 0;
     }
     
     // Preparar datos para el gráfico de actividad
@@ -148,23 +139,23 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
       _timeSpent[category] = (_timeSpent[category] ?? 0) + timeValue;
     }
     
-    // Procesar hábitos
+    // Procesar hábitos usando el modelo Habit
     for (var habit in _monthHabits) {
-      final category = habit['category'] as String? ?? 'General';
-      final type = habit['type'] as String? ?? 'count';
+      final category = habit.category;
+      final type = habit.type;
       
       // Verificar si el hábito está completado
       bool isCompleted = false;
       
       if (type == 'boolean') {
-        isCompleted = habit['current'] == true;
+        isCompleted = habit.current == true;
       } else if (type == 'count') {
-        final current = habit['current'] as int? ?? 0;
-        final goal = habit['goal'] as int? ?? 0;
+        final current = habit.current is int ? habit.current as int : 0;
+        final goal = habit.goal is int ? habit.goal as int : 0;
         isCompleted = goal > 0 && current >= goal;
       } else if (type == 'time') {
-        final current = habit['current'] as String? ?? '00:00:00';
-        final goal = habit['goal'] as String? ?? '00:00:00';
+        final current = habit.current is String ? habit.current as String : '00:00:00';
+        final goal = habit.goal is String ? habit.goal as String : '00:00:00';
         isCompleted = _compareTimeStrings(current, goal) >= 0;
       }
       
@@ -178,18 +169,18 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
       if (type == 'boolean') {
         timeValue = isCompleted ? 1.0 : 0.0;
       } else if (type == 'count') {
-        final current = habit['current'] as int? ?? 0;
-        final goal = habit['goal'] as int? ?? 0;
+        final current = habit.current is int ? habit.current as int : 0;
+        final goal = habit.goal is int ? habit.goal as int : 0;
         timeValue = goal > 0 ? (current / goal).clamp(0.0, 1.0) * 2.0 : 0.0; // Máximo 2 horas
       } else if (type == 'time') {
-        final current = habit['current'] as String? ?? '00:00:00';
+        final current = habit.current is String ? habit.current as String : '00:00:00';
         timeValue = _convertTimeStringToHours(current);
       }
       
       _timeSpent[category] = (_timeSpent[category] ?? 0) + timeValue;
       
       // Contar actividad por día para hábitos
-      final days = habit['days'] as List<dynamic>? ?? [0, 0, 0, 0, 0, 0, 0];
+      final days = habit.days;
       
       // Recorrer el mes y verificar los días con actividad
       for (int day = 1; day <= daysInMonth; day++) {
@@ -223,7 +214,7 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
     
     // Marcar días con hábitos completados
     for (var habit in _monthHabits) {
-      final days = habit['days'] as List<dynamic>? ?? [0, 0, 0, 0, 0, 0, 0];
+      final days = habit.days;
       
       // Recorrer el mes actual
       final daysInMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).day;
@@ -701,8 +692,12 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
   
   Widget _buildTimeSpentBarChart() {
     // Ordenar categorías por tiempo dedicado
-    final sortedCategories = _timeSpent.keys.toList()
-      ..sort((a, b) => _timeSpent[b]!.compareTo(_timeSpent[a]!));
+    final sortedCategories = _timeSpent.keys.toList();
+    
+    // Verificar si hay categorías antes de ordenar
+    if (sortedCategories.isNotEmpty) {
+      sortedCategories.sort((a, b) => _timeSpent[b]!.compareTo(_timeSpent[a]!));
+    }
     
     return Container(
       width: double.infinity,
@@ -743,7 +738,9 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
                   children: sortedCategories.take(6).map((category) {
                     final value = _timeSpent[category]!;
                     final maxValue = _timeSpent.values.reduce((a, b) => a > b ? a : b);
-                    final percentage = value / maxValue;
+                    
+                    // Asegurar que maxValue no sea 0 para evitar división por cero
+                    final percentage = maxValue > 0 ? value / maxValue : 0.0;
                     
                     // Asignar colores basados en la categoría
                     final color = _getCategoryColor(category);
@@ -775,16 +772,18 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                     ),
-                                    FractionallySizedBox(
-                                      widthFactor: percentage,
-                                      child: Container(
-                                        height: 24,
-                                        decoration: BoxDecoration(
-                                          color: color,
-                                          borderRadius: BorderRadius.circular(12),
+                                    // Asegurar que widthFactor no sea null o menor que 0
+                                    if (percentage > 0)
+                                      FractionallySizedBox(
+                                        widthFactor: percentage.clamp(0.01, 1.0),
+                                        child: Container(
+                                          height: 24,
+                                          decoration: BoxDecoration(
+                                            color: color,
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
                                         ),
                                       ),
-                                    ),
                                   ],
                                 ),
                               ),
@@ -826,6 +825,7 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
       'Deportes': Colors.lightBlue,
       'Arte': Colors.indigo,
       'General': Colors.grey,
+      'Educación': Colors.purple,
     };
     
     return categoryColors[category] ?? Colors.grey;
