@@ -19,33 +19,33 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
   final LocalStorageService _storageService = LocalStorageService();
   late FirebaseService _firebaseService;
   bool _isLoading = true;
-
+  
   // Datos para el resumen
   DateTime _selectedMonth = DateTime.now();
-
+  
   // Datos de tareas
   List<Task> _monthTasks = [];
   int _totalTasks = 0;
   int _completedTasks = 0;
-
+  
   // Datos de hábitos
   List<Habit> _monthHabits = [];
   int _totalHabits = 0;
   int _completedHabits = 0;
-
+  
   // Rachas
   int _currentStreak = 0;
   int _longestStreak = 0;
-
+  
   // Tiempo por categoría
   Map<String, double> _timeSpent = {};
-
+  
   // Actividad diaria
   Map<int, int> _activityByDay = {};
   Map<int, int> _tasksByDay = {};
   Map<int, int> _habitsByDay = {};
   List<FlSpot> _activitySpots = []; // Añadir esta línea
-
+  
   @override
   void initState() {
     super.initState();
@@ -54,7 +54,8 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
     _firebaseService = FirebaseService(userId);
     _loadMonthData();
   }
-
+  
+  // Modificar el método _loadMonthData para cargar correctamente los hábitos
   Future<void> _loadMonthData() async {
     setState(() {
       _isLoading = true;
@@ -62,56 +63,46 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
 
     try {
       // Obtener el primer y último día del mes seleccionado
-      final firstDayOfMonth = DateTime(
-        _selectedMonth.year,
-        _selectedMonth.month,
-        1,
-      );
-      final lastDayOfMonth = DateTime(
-        _selectedMonth.year,
-        _selectedMonth.month + 1,
-        0,
-        23,
-        59,
-        59,
-      );
-
+      final firstDayOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
+      final lastDayOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0, 23, 59, 59);
+      
       // Cargar tareas del mes desde Firebase
-      final tasks = await _firebaseService.getTasksForDateRange(
-        firstDayOfMonth,
-        lastDayOfMonth,
-      );
+      final tasks = await _firebaseService.getTasksForDateRange(firstDayOfMonth, lastDayOfMonth);
       _monthTasks = tasks;
-
-      // Cargar hábitos desde almacenamiento local
-      final habits = await _storageService.getHabits();
-
-      // Filtrar hábitos por fecha de creación (solo los creados antes o durante el mes seleccionado)
-      _monthHabits =
-          habits.where((habit) {
-            return habit.createdAt.isBefore(
-              lastDayOfMonth.add(const Duration(days: 1)),
-            );
-          }).toList();
-
+      
+      // Intentar cargar hábitos desde Firebase primero
+      try {
+        final habits = await _firebaseService.getHabitsFuture();
+        _monthHabits = habits.where((habit) {
+          return habit.createdAt.isBefore(lastDayOfMonth.add(const Duration(days: 1)));
+        }).toList();
+      } catch (e) {
+        print('Error al cargar hábitos desde Firebase: $e');
+        // Si falla Firebase, intentar cargar desde almacenamiento local
+        final habits = await _storageService.getHabits();
+        _monthHabits = habits.where((habit) {
+          return habit.createdAt.isBefore(lastDayOfMonth.add(const Duration(days: 1)));
+        }).toList();
+      }
+      
       // Calcular estadísticas
       _calculateStatistics(firstDayOfMonth, lastDayOfMonth);
-
+      
       setState(() {
         _isLoading = false;
       });
     } catch (e) {
       print('Error al cargar datos del mes: $e');
-
+      
       // Si hay un error, cargar datos de ejemplo para demostración
       _loadDemoData();
-
+      
       setState(() {
         _isLoading = false;
       });
     }
   }
-
+  
   void _loadDemoData() {
     // Datos de ejemplo para demostración en caso de error
     _totalTasks = 0;
@@ -120,36 +111,36 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
     _completedHabits = 0;
     _currentStreak = 0;
     _longestStreak = 0;
-
+    
     _timeSpent = {};
-
+    
     // Generar datos de actividad diaria de ejemplo
     _activityByDay = {};
     _tasksByDay = {};
     _habitsByDay = {};
-    final daysInMonth =
-        DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).day;
+    final daysInMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).day;
     for (int i = 1; i <= daysInMonth; i++) {
       _activityByDay[i] = 0;
       _tasksByDay[i] = 0;
       _habitsByDay[i] = 0;
     }
   }
-
+  
   // Modificar el método _calculateStatistics para usar fechas específicas
 
+  // Modificar el método _calculateStatistics para procesar correctamente los hábitos con el nuevo formato
   void _calculateStatistics(DateTime startDate, DateTime endDate) {
     // Reiniciar contadores
     _totalTasks = _monthTasks.length;
     _completedTasks = _monthTasks.where((task) => task.isCompleted).length;
-
+    
     // Contar hábitos
     _totalHabits = _monthHabits.length;
     _completedHabits = 0;
-
+    
     // Reiniciar tiempo por categoría
     _timeSpent = {};
-
+    
     // Reiniciar actividad diaria
     _activityByDay = {};
     _tasksByDay = {};
@@ -160,7 +151,7 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
       _tasksByDay[i] = 0;
       _habitsByDay[i] = 0;
     }
-
+    
     // Procesar tareas
     for (var task in _monthTasks) {
       // Contar actividad por día
@@ -169,62 +160,113 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
         _activityByDay[day] = (_activityByDay[day] ?? 0) + 1;
         _tasksByDay[day] = (_tasksByDay[day] ?? 0) + 1;
       }
-
+      
       // Calcular tiempo por categoría (estimado)
       final category = task.category;
       // Asumimos que cada tarea completada representa 1 hora, y cada tarea pendiente 0.5 horas
       final timeValue = task.isCompleted ? 1.0 : 0.5;
       _timeSpent[category] = (_timeSpent[category] ?? 0) + timeValue;
     }
-
-    // Modificar el método _calculateStatistics para corregir la visualización de hábitos en la gráfica
-    // Buscar la sección donde procesamos los hábitos y reemplazarla con este código:
-
-    // Procesar hábitos usando el modelo Habit y fechas específicas
+    
+    // Procesar hábitos usando el modelo Habit actualizado y fechas específicas
     for (var habit in _monthHabits) {
       final category = habit.category;
       final type = habit.type;
-
+      
       // Verificar si el hábito está completado
       bool isCompleted = false;
-
+      
       if (type == 'boolean') {
+        // Para hábitos boolean, verificar si current es true
         isCompleted = habit.current == true;
+        
+        // También verificar si hay alguna fecha completada para este mes
+        if (!isCompleted && habit.completedDates.isNotEmpty) {
+          for (var entry in habit.completedDates.entries) {
+            try {
+              final date = DateTime.parse(entry.key);
+              if (date.year == _selectedMonth.year && 
+                  date.month == _selectedMonth.month && 
+                  entry.value == 2) {
+                isCompleted = true;
+                break;
+              }
+            } catch (e) {
+              print('Error al parsear fecha: $e');
+            }
+          }
+        }
       } else if (type == 'count') {
         final current = habit.current is int ? habit.current as int : 0;
         final goal = habit.goal is int ? habit.goal as int : 0;
         isCompleted = goal > 0 && current >= goal;
       } else if (type == 'time') {
-        final current =
-            habit.current is String ? habit.current as String : '00:00:00';
+        final current = habit.current is String ? habit.current as String : '00:00:00';
         final goal = habit.goal is String ? habit.goal as String : '00:00:00';
         isCompleted = _compareTimeStrings(current, goal) >= 0;
       }
-
+      
       if (isCompleted) {
         _completedHabits++;
       }
-
+      
       // Calcular tiempo por categoría para hábitos (estimado)
       double timeValue = 0.0;
-
+      
       if (type == 'boolean') {
-        timeValue = isCompleted ? 1.0 : 0.0;
+        // Para hábitos boolean, asignar 1 hora si está completado
+        // Contar días completados en el mes actual
+        int completedDaysCount = 0;
+        
+        habit.completedDates.forEach((dateStr, status) {
+          try {
+            final date = DateTime.parse(dateStr);
+            if (date.year == _selectedMonth.year && 
+                date.month == _selectedMonth.month && 
+                status == 2) {
+              completedDaysCount++;
+            }
+          } catch (e) {
+            print('Error al parsear fecha para tiempo: $e');
+          }
+        });
+        
+        // Si no hay días completados pero current es true, contar como 1
+        if (completedDaysCount == 0 && habit.current == true) {
+          completedDaysCount = 1;
+        }
+        
+        timeValue = completedDaysCount * 1.0; // 1 hora por día completado
       } else if (type == 'count') {
         final current = habit.current is int ? habit.current as int : 0;
         final goal = habit.goal is int ? habit.goal as int : 0;
-        timeValue =
-            goal > 0
-                ? (current / goal).clamp(0.0, 1.0) * 2.0
-                : 0.0; // Máximo 2 horas
+        timeValue = goal > 0 ? (current / goal).clamp(0.0, 1.0) * 2.0 : 0.0; // Máximo 2 horas
       } else if (type == 'time') {
-        final current =
-            habit.current is String ? habit.current as String : '00:00:00';
-        timeValue = _convertTimeStringToHours(current);
+        // Si hay tiempo registrado para el mes actual, usarlo
+        double totalHours = 0.0;
+        
+        if (habit.registeredTimes.isNotEmpty) {
+          habit.registeredTimes.forEach((dateStr, timeStr) {
+            try {
+              final date = DateTime.parse(dateStr);
+              if (date.year == _selectedMonth.year && date.month == _selectedMonth.month) {
+                totalHours += _convertTimeStringToHours(timeStr);
+              }
+            } catch (e) {
+              print('Error al procesar tiempo registrado: $e');
+            }
+          });
+        } else {
+          // Si no hay tiempos registrados, usar el valor actual
+          final current = habit.current is String ? habit.current as String : '00:00:00';
+          totalHours = _convertTimeStringToHours(current);
+        }
+        
+        timeValue = totalHours;
       }
-
+      
       _timeSpent[category] = (_timeSpent[category] ?? 0) + timeValue;
-
+      
       // Contar actividad por día para hábitos usando fechas específicas
       if (habit.completedDates.isNotEmpty) {
         // Recorrer todas las fechas completadas
@@ -232,12 +274,11 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
           try {
             // Convertir la cadena de fecha a objeto DateTime
             final date = DateTime.parse(dateStr);
-
+            
             // Verificar si la fecha está dentro del mes seleccionado
-            if (date.year == _selectedMonth.year &&
-                date.month == _selectedMonth.month) {
+            if (date.year == _selectedMonth.year && date.month == _selectedMonth.month) {
               final day = date.day;
-
+              
               // Solo contar si el estado es mayor que 0 (parcial o completado)
               if (status > 0) {
                 _activityByDay[day] = (_activityByDay[day] ?? 0) + 1;
@@ -248,19 +289,50 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
             print('Error al procesar fecha de hábito: $e');
           }
         });
+      } else if (type == 'boolean' && habit.current == true) {
+        // Si es un hábito boolean marcado como completado pero sin fechas específicas,
+        // asumimos que se completó hoy
+        final today = DateTime.now();
+        if (today.year == _selectedMonth.year && today.month == _selectedMonth.month) {
+          final day = today.day;
+          _activityByDay[day] = (_activityByDay[day] ?? 0) + 1;
+          _habitsByDay[day] = (_habitsByDay[day] ?? 0) + 1;
+        }
+      } else {
+        // Si no hay fechas específicas, usar el array de días
+        final today = DateTime.now();
+        if (today.year == _selectedMonth.year && today.month == _selectedMonth.month) {
+          for (int i = 0; i < habit.days.length; i++) {
+            if (habit.days[i] > 0) {
+              // Calcular el día del mes correspondiente a este día de la semana
+              final dayOfWeek = i; // 0-6 (0 = domingo)
+              final firstDayOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
+              final firstDayOfWeek = firstDayOfMonth.weekday % 7; // 0-6 (0 = domingo)
+              
+              // Calcular todos los días de este día de la semana en el mes
+              for (int day = 1; day <= daysInMonth; day++) {
+                final date = DateTime(_selectedMonth.year, _selectedMonth.month, day);
+                if (date.weekday % 7 == dayOfWeek && !date.isAfter(today)) {
+                  _activityByDay[day] = (_activityByDay[day] ?? 0) + 1;
+                  _habitsByDay[day] = (_habitsByDay[day] ?? 0) + 1;
+                }
+              }
+            }
+          }
+        }
       }
     }
-
+    
     // Calcular rachas
     _calculateStreaks();
   }
-
+  
   // Modificar el método _calculateStreaks para usar fechas específicas
   void _calculateStreaks() {
     // Crear un mapa de actividad por fecha
     Map<String, bool> activityByDate = {};
     final today = DateTime.now();
-
+    
     // Marcar días con tareas completadas (solo hasta hoy)
     for (var task in _monthTasks) {
       if (task.isCompleted) {
@@ -271,13 +343,12 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
         }
       }
     }
-
+    
     // Marcar días con hábitos completados (solo hasta hoy)
     for (var habit in _monthHabits) {
       // Usar el mapa de fechas específicas
       habit.completedDates.forEach((dateStr, status) {
-        if (status == 2) {
-          // Solo contar como completado si el estado es 2
+        if (status == 2) { // Solo contar como completado si el estado es 2
           final date = DateTime.parse(dateStr);
           // Solo considerar días hasta hoy
           if (!date.isAfter(today)) {
@@ -286,11 +357,11 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
         }
       });
     }
-
+    
     // Calcular racha actual
     int currentStreak = 0;
     DateTime checkDate = today;
-
+    
     // Retroceder hasta encontrar un día sin actividad
     while (true) {
       final dateStr = DateFormat('yyyy-MM-dd').format(checkDate);
@@ -301,19 +372,18 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
         break;
       }
     }
-
+    
     // Calcular racha más larga
     int longestStreak = 0;
     int tempStreak = 0;
-
+    
     // Ordenar fechas (solo hasta hoy)
-    List<DateTime> dates =
-        activityByDate.keys
-            .map((dateStr) => DateFormat('yyyy-MM-dd').parse(dateStr))
-            .where((date) => !date.isAfter(today)) // Filtrar fechas futuras
-            .toList()
-          ..sort((a, b) => a.compareTo(b));
-
+    List<DateTime> dates = activityByDate.keys
+        .map((dateStr) => DateFormat('yyyy-MM-dd').parse(dateStr))
+        .where((date) => !date.isAfter(today)) // Filtrar fechas futuras
+        .toList()
+      ..sort((a, b) => a.compareTo(b));
+    
     for (int i = 0; i < dates.length; i++) {
       if (i > 0) {
         final difference = dates[i].difference(dates[i - 1]).inDays;
@@ -331,33 +401,34 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
         tempStreak = 1;
       }
     }
-
+    
     // Verificar la última racha
     if (tempStreak > longestStreak) {
       longestStreak = tempStreak;
     }
-
+    
     _currentStreak = currentStreak;
     _longestStreak = longestStreak;
   }
 
   // Añadir este método auxiliar para formatear fechas
+  // Modificar el método _formatDate para asegurarnos de que el formato sea correcto
   String _formatDate(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
-
+  
   // Ya no necesitamos este método porque ahora usamos un gráfico de barras
   void _prepareActivityChart() {
     // Este método ya no hace nada, pero lo mantenemos por si se llama desde algún lugar
   }
-
+  
   // Función para comparar dos strings de tiempo (formato HH:MM:SS)
   int _compareTimeStrings(String time1, String time2) {
     final minutes1 = _convertTimeStringToMinutes(time1);
     final minutes2 = _convertTimeStringToMinutes(time2);
     return minutes1.compareTo(minutes2);
   }
-
+  
   // Función para convertir string de tiempo a minutos
   int _convertTimeStringToMinutes(String timeStr) {
     try {
@@ -373,7 +444,7 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
     }
     return 0;
   }
-
+  
   // Función para convertir string de tiempo a horas (para gráficos)
   double _convertTimeStringToHours(String timeStr) {
     try {
@@ -389,35 +460,27 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
     }
     return 0.0;
   }
-
+  
   void _previousMonth() {
     setState(() {
-      _selectedMonth = DateTime(
-        _selectedMonth.year,
-        _selectedMonth.month - 1,
-        1,
-      );
+      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1, 1);
     });
     _loadMonthData();
   }
-
+  
   void _nextMonth() {
     // No permitir seleccionar meses futuros
     final now = DateTime.now();
     if (_selectedMonth.year == now.year && _selectedMonth.month == now.month) {
       return;
     }
-
+    
     setState(() {
-      _selectedMonth = DateTime(
-        _selectedMonth.year,
-        _selectedMonth.month + 1,
-        1,
-      );
+      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1);
     });
     _loadMonthData();
   }
-
+  
   void _showRachaInfoDialog() {
     showDialog(
       context: context,
@@ -434,21 +497,13 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
-                const Text(
-                  '• Cada día que completes al menos una tarea o hábito, tu racha aumenta en 1.',
-                ),
+                const Text('• Cada día que completes al menos una tarea o hábito, tu racha aumenta en 1.'),
                 const SizedBox(height: 8),
-                const Text(
-                  '• Si un día no completas ninguna actividad, tu racha actual se reinicia a 0.',
-                ),
+                const Text('• Si un día no completas ninguna actividad, tu racha actual se reinicia a 0.'),
                 const SizedBox(height: 8),
-                const Text(
-                  '• La racha más larga muestra tu mejor secuencia de días consecutivos con actividades completadas.',
-                ),
+                const Text('• La racha más larga muestra tu mejor secuencia de días consecutivos con actividades completadas.'),
                 const SizedBox(height: 8),
-                const Text(
-                  '• Solo se cuentan actividades hasta el día actual, no se consideran actividades futuras.',
-                ),
+                const Text('• Solo se cuentan actividades hasta el día actual, no se consideran actividades futuras.'),
                 const SizedBox(height: 16),
                 const Text(
                   '¡Mantén tu racha activa para desarrollar consistencia en tus hábitos!',
@@ -474,7 +529,10 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
       appBar: AppBar(
         title: const Text(
           'Resumen Personal',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+          ),
         ),
         centerTitle: true,
         backgroundColor: const Color(0xFF4A90E2),
@@ -484,51 +542,50 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
         ),
       ),
       backgroundColor: const Color(0xFFE0FFFF),
-      body:
-          _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 16),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const SizedBox(height: 16),
+                  
+                  // Selector de mes
+                  _buildMonthSelector(),
+                  
+                  const SizedBox(height: 24),
 
-                    // Selector de mes
-                    _buildMonthSelector(),
+                  // Círculo de porcentaje
+                  _buildCompletionCircle(),
 
-                    const SizedBox(height: 24),
+                  const SizedBox(height: 32),
 
-                    // Círculo de porcentaje
-                    _buildCompletionCircle(),
+                  // Rachas
+                  _buildStreakSection(),
+                  
+                  const SizedBox(height: 32),
 
-                    const SizedBox(height: 32),
+                  // Tiempo dedicado (ahora como gráfico de barras horizontal)
+                  _buildTimeSpentBarChart(),
 
-                    // Rachas
-                    _buildStreakSection(),
+                  const SizedBox(height: 32),
 
-                    const SizedBox(height: 32),
+                  // Gráfico de actividad diaria mejorado
+                  _buildActivityChart(),
+                  
+                  const SizedBox(height: 32),
 
-                    // Tiempo dedicado (ahora como gráfico de barras horizontal)
-                    _buildTimeSpentBarChart(),
-
-                    const SizedBox(height: 32),
-
-                    // Gráfico de actividad diaria mejorado
-                    _buildActivityChart(),
-
-                    const SizedBox(height: 32),
-
-                    // Estadísticas
-                    _buildStatisticsSection(),
-
-                    const SizedBox(height: 24),
-                  ],
-                ),
+                  // Estadísticas
+                  _buildStatisticsSection(),
+                  
+                  const SizedBox(height: 24),
+                ],
               ),
+            ),
     );
   }
-
+  
   Widget _buildMonthSelector() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -552,7 +609,10 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
           ),
           Text(
             DateFormat('MMMM yyyy', 'es_ES').format(_selectedMonth),
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.chevron_right, size: 28),
@@ -562,17 +622,16 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
       ),
     );
   }
-
+  
   Widget _buildCompletionCircle() {
     // Calcular el total de actividades (tareas + hábitos)
     final totalActivities = _totalTasks + _totalHabits;
     final completedActivities = _completedTasks + _completedHabits;
-
-    final completionPercentage =
-        totalActivities > 0
-            ? (completedActivities / totalActivities * 100).round()
-            : 0;
-
+    
+    final completionPercentage = totalActivities > 0 
+        ? (completedActivities / totalActivities * 100).round() 
+        : 0;
+    
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -590,7 +649,10 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
         children: [
           const Text(
             'Progreso General',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 20),
           Stack(
@@ -601,10 +663,7 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
                 height: 220,
                 child: CustomPaint(
                   painter: CircleProgressPainter(
-                    percentage:
-                        totalActivities > 0
-                            ? completedActivities / totalActivities
-                            : 0,
+                    percentage: totalActivities > 0 ? completedActivities / totalActivities : 0,
                     color: const Color(0xFF0052A9),
                     strokeWidth: 20,
                   ),
@@ -637,39 +696,27 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildProgressDetail(
-                'Tareas',
-                _completedTasks,
-                _totalTasks,
-                Colors.blue,
-              ),
+              _buildProgressDetail('Tareas', _completedTasks, _totalTasks, Colors.blue),
               const SizedBox(width: 24),
-              _buildProgressDetail(
-                'Hábitos',
-                _completedHabits,
-                _totalHabits,
-                Colors.green,
-              ),
+              _buildProgressDetail('Hábitos', _completedHabits, _totalHabits, Colors.green),
             ],
           ),
         ],
       ),
     );
   }
-
-  Widget _buildProgressDetail(
-    String label,
-    int completed,
-    int total,
-    Color color,
-  ) {
+  
+  Widget _buildProgressDetail(String label, int completed, int total, Color color) {
     final percentage = total > 0 ? (completed / total * 100).round() : 0;
-
+    
     return Column(
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         const SizedBox(height: 4),
         Text(
@@ -680,11 +727,17 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        Text('($percentage%)', style: TextStyle(fontSize: 14, color: color)),
+        Text(
+          '($percentage%)',
+          style: TextStyle(
+            fontSize: 14,
+            color: color,
+          ),
+        ),
       ],
     );
   }
-
+  
   Widget _buildStreakSection() {
     return Container(
       width: double.infinity,
@@ -708,7 +761,10 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
             children: [
               const Text(
                 'Tus rachas',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               IconButton(
                 icon: const Icon(Icons.info_outline),
@@ -739,30 +795,43 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
       ),
     );
   }
-
-  Widget _buildStreakItem(String label, int value, IconData icon, Color color) {
+  
+  Widget _buildStreakItem(
+    String label, 
+    int value, 
+    IconData icon, 
+    Color color,
+  ) {
     return Column(
       children: [
         Icon(icon, color: color, size: 48),
         const SizedBox(height: 12),
         Text(
           '$value días',
-          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        Text(label, style: const TextStyle(fontSize: 18)),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 18,
+          ),
+        ),
       ],
     );
   }
-
+  
   Widget _buildTimeSpentBarChart() {
     // Ordenar categorías por tiempo dedicado
     final sortedCategories = _timeSpent.keys.toList();
-
+    
     // Verificar si hay categorías antes de ordenar
     if (sortedCategories.isNotEmpty) {
       sortedCategories.sort((a, b) => _timeSpent[b]!.compareTo(_timeSpent[a]!));
     }
-
+    
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -782,104 +851,98 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
         children: [
           const Text(
             'Categorias Activas',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 20),
           _timeSpent.isEmpty
               ? const Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 30),
-                  child: Text(
-                    'No hay datos para mostrar',
-                    style: TextStyle(fontSize: 16),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 30),
+                    child: Text(
+                      'No hay datos para mostrar',
+                      style: TextStyle(fontSize: 16),
+                    ),
                   ),
-                ),
-              )
+                )
               : Column(
-                children:
-                    sortedCategories.take(6).map((category) {
-                      final value = _timeSpent[category]!;
-                      final maxValue = _timeSpent.values.reduce(
-                        (a, b) => a > b ? a : b,
-                      );
-
-                      // Asegurar que maxValue no sea 0 para evitar división por cero
-                      final percentage = maxValue > 0 ? value / maxValue : 0.0;
-
-                      // Asignar colores basados en la categoría
-                      final color = _getCategoryColor(category);
-
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                SizedBox(
-                                  width: 100,
-                                  child: Text(
-                                    category,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                  children: sortedCategories.take(6).map((category) {
+                    final value = _timeSpent[category]!;
+                    final maxValue = _timeSpent.values.reduce((a, b) => a > b ? a : b);
+                    
+                    // Asegurar que maxValue no sea 0 para evitar división por cero
+                    final percentage = maxValue > 0 ? value / maxValue : 0.0;
+                    
+                    // Asignar colores basados en la categoría
+                    final color = _getCategoryColor(category);
+                    
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              SizedBox(
+                                width: 100,
+                                child: Text(
+                                  category,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                Expanded(
-                                  child: Stack(
-                                    children: [
-                                      Container(
-                                        height: 24,
-                                        decoration: BoxDecoration(
-                                          color: Colors.grey.withOpacity(0.2),
-                                          borderRadius: BorderRadius.circular(
-                                            12,
+                              ),
+                              Expanded(
+                                child: Stack(
+                                  children: [
+                                    Container(
+                                      height: 24,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    // Asegurar que widthFactor no sea null o menor que 0
+                                    if (percentage > 0)
+                                      FractionallySizedBox(
+                                        widthFactor: percentage.clamp(0.01, 1.0),
+                                        child: Container(
+                                          height: 24,
+                                          decoration: BoxDecoration(
+                                            color: color,
+                                            borderRadius: BorderRadius.circular(12),
                                           ),
                                         ),
                                       ),
-                                      // Asegurar que widthFactor no sea null o menor que 0
-                                      if (percentage > 0)
-                                        FractionallySizedBox(
-                                          widthFactor: percentage.clamp(
-                                            0.01,
-                                            1.0,
-                                          ),
-                                          child: Container(
-                                            height: 24,
-                                            decoration: BoxDecoration(
-                                              color: color,
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                            ),
-                                          ),
-                                        ),
-                                    ],
+                                  ],
+                                ),
+                              ),
+                              SizedBox(
+                                width: 50,
+                                child: Text(
+                                  value.toStringAsFixed(1),
+                                  textAlign: TextAlign.right,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                SizedBox(
-                                  width: 50,
-                                  child: Text(
-                                    value.toStringAsFixed(1),
-                                    textAlign: TextAlign.right,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-              ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
         ],
       ),
     );
   }
-
+  
   Color _getCategoryColor(String category) {
     final Map<String, Color> categoryColors = {
       'Trabajo': Colors.blue,
@@ -897,14 +960,13 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
       'General': Colors.grey,
       'Educación': Colors.purple,
     };
-
+    
     return categoryColors[category] ?? Colors.grey;
   }
-
+  
   Widget _buildActivityChart() {
-    final daysInMonth =
-        DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).day;
-
+    final daysInMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).day;
+    
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -924,118 +986,115 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
         children: [
           const Text(
             'Actividad diaria',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 8),
           const Text(
             'Número de actividades completadas por día',
-            style: TextStyle(fontSize: 14, color: Colors.grey),
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey,
+            ),
           ),
           const SizedBox(height: 20),
           SizedBox(
             height: 220,
-            child:
-                _activityByDay.isEmpty
-                    ? const Center(child: Text('No hay datos para mostrar'))
-                    : BarChart(
-                      BarChartData(
-                        alignment: BarChartAlignment.spaceAround,
-                        maxY:
-                            (_activityByDay.values.isEmpty
-                                ? 0
-                                : _activityByDay.values.reduce(
-                                  (a, b) => a > b ? a : b,
-                                )) +
-                            1,
-                        barTouchData: BarTouchData(
-                          enabled: true,
-                          touchTooltipData: BarTouchTooltipData(
-                            tooltipBgColor: Colors.blueGrey.withOpacity(0.8),
-                            getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                              final day = group.x.toInt();
-                              final total = _activityByDay[day] ?? 0;
-                              final tasks = _tasksByDay[day] ?? 0;
-                              final habits = _habitsByDay[day] ?? 0;
-
-                              return BarTooltipItem(
-                                'Día $day\nTotal: $total\nTareas: $tasks\nHábitos: $habits',
-                                const TextStyle(color: Colors.white),
-                              );
-                            },
-                          ),
-                        ),
-                        titlesData: FlTitlesData(
-                          show: true,
-                          bottomTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              reservedSize: 30,
-                              getTitlesWidget: (value, meta) {
-                                // Mostrar solo algunos días para no sobrecargar
-                                if (value % 5 == 0 ||
-                                    value == 1 ||
-                                    value == daysInMonth) {
-                                  return Padding(
-                                    padding: const EdgeInsets.only(top: 8),
-                                    child: Text(
-                                      value.toInt().toString(),
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                  );
-                                }
-                                return const SizedBox();
-                              },
-                            ),
-                          ),
-                          leftTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              reservedSize: 30,
-                              getTitlesWidget: (value, meta) {
-                                if (value == 0) return const SizedBox();
-                                if (value % 1 == 0) {
-                                  return Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: Text(
-                                      value.toInt().toString(),
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                  );
-                                }
-                                return const SizedBox();
-                              },
-                            ),
-                          ),
-                          topTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                          rightTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                        ),
-                        gridData: FlGridData(
-                          show: true,
-                          drawVerticalLine: false,
-                          horizontalInterval: 1,
-                          getDrawingHorizontalLine: (value) {
-                            return FlLine(
-                              color: Colors.grey.withOpacity(0.2),
-                              strokeWidth: 1,
+            child: _activityByDay.isEmpty
+                ? const Center(child: Text('No hay datos para mostrar'))
+                : BarChart(
+                    BarChartData(
+                      alignment: BarChartAlignment.spaceAround,
+                      maxY: (_activityByDay.values.isEmpty ? 0 : _activityByDay.values.reduce((a, b) => a > b ? a : b)) + 1,
+                      barTouchData: BarTouchData(
+                        enabled: true,
+                        touchTooltipData: BarTouchTooltipData(
+                          tooltipBgColor: Colors.blueGrey.withOpacity(0.8),
+                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                            final day = group.x.toInt();
+                            final total = _activityByDay[day] ?? 0;
+                            final tasks = _tasksByDay[day] ?? 0;
+                            final habits = _habitsByDay[day] ?? 0;
+                            
+                            return BarTooltipItem(
+                              'Día $day\nTotal: $total\nTareas: $tasks\nHábitos: $habits',
+                              const TextStyle(color: Colors.white),
                             );
                           },
                         ),
-                        borderData: FlBorderData(show: false),
-                        barGroups: _getBarGroups(),
                       ),
+                      titlesData: FlTitlesData(
+                        show: true,
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 30,
+                            getTitlesWidget: (value, meta) {
+                              // Mostrar solo algunos días para no sobrecargar
+                              if (value % 5 == 0 || value == 1 || value == daysInMonth) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    value.toInt().toString(),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                );
+                              }
+                              return const SizedBox();
+                            },
+                          ),
+                        ),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 30,
+                            getTitlesWidget: (value, meta) {
+                              if (value == 0) return const SizedBox();
+                              if (value % 1 == 0) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: Text(
+                                    value.toInt().toString(),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                );
+                              }
+                              return const SizedBox();
+                            },
+                          ),
+                        ),
+                        topTitles: AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        rightTitles: AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                      ),
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        horizontalInterval: 1,
+                        getDrawingHorizontalLine: (value) {
+                          return FlLine(
+                            color: Colors.grey.withOpacity(0.2),
+                            strokeWidth: 1,
+                          );
+                        },
+                      ),
+                      borderData: FlBorderData(show: false),
+                      barGroups: _getBarGroups(),
                     ),
+                  ),
           ),
           const SizedBox(height: 16),
           // Leyenda
@@ -1062,7 +1121,7 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
       ),
     );
   }
-
+  
   Widget _buildLegendItem(String label, Color color) {
     return Row(
       children: [
@@ -1077,21 +1136,23 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
         const SizedBox(width: 8),
         Text(
           label,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ],
     );
   }
-
+  
   List<BarChartGroupData> _getBarGroups() {
-    final daysInMonth =
-        DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).day;
+    final daysInMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).day;
     List<BarChartGroupData> barGroups = [];
-
+    
     for (int day = 1; day <= daysInMonth; day++) {
       final tasks = _tasksByDay[day] ?? 0;
       final habits = _habitsByDay[day] ?? 0;
-
+      
       // Solo mostrar barras para días con actividad
       if (tasks > 0 || habits > 0) {
         barGroups.add(
@@ -1135,22 +1196,21 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
         );
       }
     }
-
+    
     return barGroups;
   }
-
+  
   Widget _buildStatisticsSection() {
     // Calcular categorías activas
     final activeCategories = _timeSpent.keys.length;
-
+    
     // Calcular productividad general
     final totalActivities = _totalTasks + _totalHabits;
     final completedActivities = _completedTasks + _completedHabits;
-    final productivity =
-        totalActivities > 0
-            ? (completedActivities / totalActivities * 100).round()
-            : 0;
-
+    final productivity = totalActivities > 0 
+        ? (completedActivities / totalActivities * 100).round() 
+        : 0;
+    
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -1170,32 +1230,35 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
         children: [
           const Text(
             'Estadísticas',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 16),
           _estadisticaItem(
-            Icons.task_alt,
-            Colors.green,
-            'Tareas completadas',
-            '$_completedTasks de $_totalTasks',
+            Icons.task_alt, 
+            Colors.green, 
+            'Tareas completadas', 
+            '$_completedTasks de $_totalTasks', 
           ),
           _estadisticaItem(
-            Icons.trending_up,
-            Colors.blue,
-            'Hábitos activos',
-            '$_completedHabits de $_totalHabits',
+            Icons.trending_up, 
+            Colors.blue, 
+            'Hábitos activos', 
+            '$_completedHabits de $_totalHabits', 
           ),
           _estadisticaItem(
-            Icons.category,
-            Colors.purple,
-            'Categorías activas',
-            '$activeCategories',
+            Icons.category, 
+            Colors.purple, 
+            'Categorías activas', 
+            '$activeCategories', 
           ),
           _estadisticaItem(
-            Icons.auto_graph,
-            Colors.orange,
-            'Productividad general',
-            '$productivity%',
+            Icons.auto_graph, 
+            Colors.orange, 
+            'Productividad general', 
+            '$productivity%', 
           ),
         ],
       ),
@@ -1203,10 +1266,10 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
   }
 
   Widget _estadisticaItem(
-    IconData icon,
-    Color color,
-    String label,
-    String valor,
+    IconData icon, 
+    Color color, 
+    String label, 
+    String valor, 
   ) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -1218,7 +1281,10 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
             '$label: ',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-          Text(valor, style: const TextStyle(fontSize: 18)),
+          Text(
+            valor,
+            style: const TextStyle(fontSize: 18),
+          ),
         ],
       ),
     );
@@ -1230,37 +1296,35 @@ class CircleProgressPainter extends CustomPainter {
   final double percentage;
   final Color color;
   final double strokeWidth;
-
+  
   CircleProgressPainter({
     required this.percentage,
     required this.color,
     required this.strokeWidth,
   });
-
+  
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = (size.width - strokeWidth) / 2;
-
+    
     // Dibujar círculo de fondo
-    final backgroundPaint =
-        Paint()
-          ..color = Colors.grey.withOpacity(0.2)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = strokeWidth;
-
+    final backgroundPaint = Paint()
+      ..color = Colors.grey.withOpacity(0.2)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+    
     canvas.drawCircle(center, radius, backgroundPaint);
-
+    
     // Dibujar arco de progreso
-    final progressPaint =
-        Paint()
-          ..color = color
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = strokeWidth
-          ..strokeCap = StrokeCap.round;
-
+    final progressPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    
     final sweepAngle = 2 * math.pi * percentage;
-
+    
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       -math.pi / 2, // Comenzar desde arriba
@@ -1269,11 +1333,11 @@ class CircleProgressPainter extends CustomPainter {
       progressPaint,
     );
   }
-
+  
   @override
   bool shouldRepaint(CircleProgressPainter oldDelegate) {
     return oldDelegate.percentage != percentage ||
-        oldDelegate.color != color ||
-        oldDelegate.strokeWidth != strokeWidth;
+           oldDelegate.color != color ||
+           oldDelegate.strokeWidth != strokeWidth;
   }
 }

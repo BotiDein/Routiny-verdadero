@@ -23,7 +23,7 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
   final TextEditingController _descriptionController = TextEditingController();
   
   String _selectedCategory = 'Ejercicio';
-  String _selectedType = 'count'; // 'count', 'time', 'boolean'
+  String _selectedType = 'time'; // 'time', 'boolean'
   String _selectedOption = 'Al menos';
   bool _isGoalEnabled = true;
   
@@ -31,6 +31,11 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
   int _hours = 0;
   int _minutes = 0;
   int _seconds = 0;
+
+  // Valores para el tiempo registrado hoy
+  int _regHours = 0;
+  int _regMinutes = 0;
+  int _regSeconds = 0;
   
   final List<String> _categories = [
     'Ejercicio',
@@ -59,26 +64,42 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
       _titleController.text = widget.habit!.name;
       _descriptionController.text = widget.habit!.description;
       _selectedCategory = widget.habit!.category;
-      _selectedType = widget.habit!.type;
-      
-      if (_selectedType == 'count') {
-        _selectedOption = widget.habit!.option;
-        if (widget.habit!.goal != null && widget.habit!.goal is int) {
-          _goalController.text = (widget.habit!.goal as int).toString();
-        }
-        _amountController.text = widget.habit!.amount.toString();
-        _isGoalEnabled = _selectedOption != 'Sin objetivo';
-      } else if (_selectedType == 'time') {
+      _selectedType = widget.habit!.type == 'count' ? 'time' : widget.habit!.type;
+    
+      if (widget.habit!.type == 'count' || widget.habit!.type == 'time') {
         _selectedOption = widget.habit!.option;
         _isGoalEnabled = _selectedOption != 'Sin objetivo';
         
         // Cargar el tiempo si existe
-        if (widget.habit!.goal != null && widget.habit!.goal is String) {
-          final timeParts = (widget.habit!.goal as String).split(':');
-          if (timeParts.length == 3) {
-            _hours = int.tryParse(timeParts[0]) ?? 0;
-            _minutes = int.tryParse(timeParts[1]) ?? 0;
-            _seconds = int.tryParse(timeParts[2]) ?? 0;
+        if (widget.habit!.goal != null) {
+          if (widget.habit!.type == 'time' && widget.habit!.goal is String) {
+            final timeParts = (widget.habit!.goal as String).split(':');
+            if (timeParts.length == 3) {
+              _hours = int.tryParse(timeParts[0]) ?? 0;
+              _minutes = int.tryParse(timeParts[1]) ?? 0;
+              _seconds = int.tryParse(timeParts[2]) ?? 0;
+            }
+          } else if (widget.habit!.type == 'count' && widget.habit!.goal is int) {
+            // Convertir el objetivo de conteo a minutos para tipo tiempo
+            _minutes = (widget.habit!.goal as int);
+            _hours = 0;
+            _seconds = 0;
+          }
+        }
+      }
+
+      // Cargar el tiempo registrado para hoy si existe
+      if (widget.habit!.registeredTimes != null) {
+        final today = DateTime.now().weekday % 7;
+        if (widget.habit!.registeredTimes!.containsKey(today.toString())) {
+          final regTime = widget.habit!.registeredTimes![today.toString()];
+          if (regTime != null) {
+            final timeParts = regTime.split(':');
+            if (timeParts.length == 3) {
+              _regHours = int.tryParse(timeParts[0]) ?? 0;
+              _regMinutes = int.tryParse(timeParts[1]) ?? 0;
+              _regSeconds = int.tryParse(timeParts[2]) ?? 0;
+            }
           }
         }
       }
@@ -248,8 +269,166 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
     );
   }
 
+  void _showRegisteredTimePickerDialog() {
+    int hours = _regHours;
+    int minutes = _regMinutes;
+    int seconds = _regSeconds;
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Registrar Tiempo'),
+          content: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return SizedBox(
+                height: 180,
+                child: Column(
+                  children: [
+                    const Text('¿Cuánto tiempo dedicaste hoy a este hábito?'),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        // Horas
+                        Column(
+                          children: [
+                            const Text('Horas'),
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.arrow_drop_up),
+                                  onPressed: () {
+                                    setState(() {
+                                      if (hours < 23) hours++;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                            Text(
+                              hours.toString().padLeft(2, '0'),
+                              style: const TextStyle(fontSize: 24),
+                            ),
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.arrow_drop_down),
+                                  onPressed: () {
+                                    setState(() {
+                                      if (hours > 0) hours--;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        // Minutos
+                        Column(
+                          children: [
+                            const Text('Minutos'),
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.arrow_drop_up),
+                                  onPressed: () {
+                                    setState(() {
+                                      if (minutes < 59) minutes++;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                            Text(
+                              minutes.toString().padLeft(2, '0'),
+                              style: const TextStyle(fontSize: 24),
+                            ),
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.arrow_drop_down),
+                                  onPressed: () {
+                                    setState(() {
+                                      if (minutes > 0) minutes--;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        // Segundos
+                        Column(
+                          children: [
+                            const Text('Segundos'),
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.arrow_drop_up),
+                                  onPressed: () {
+                                    setState(() {
+                                      if (seconds < 59) seconds++;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                            Text(
+                              seconds.toString().padLeft(2, '0'),
+                              style: const TextStyle(fontSize: 24),
+                            ),
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.arrow_drop_down),
+                                  onPressed: () {
+                                    setState(() {
+                                      if (seconds > 0) seconds--;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _regHours = hours;
+                  _regMinutes = minutes;
+                  _regSeconds = seconds;
+                });
+                Navigator.of(context).pop();
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   String get _formattedTime {
     return '${_hours.toString().padLeft(2, '0')}:${_minutes.toString().padLeft(2, '0')}:${_seconds.toString().padLeft(2, '0')}';
+  }
+
+  String get _formattedRegisteredTime {
+    return '${_regHours.toString().padLeft(2, '0')}:${_regMinutes.toString().padLeft(2, '0')}:${_regSeconds.toString().padLeft(2, '0')}';
   }
 
   void _showCategoryDialog() {
@@ -348,20 +527,12 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
                         children: [
                           Expanded(
                             child: _buildTypeOption(
-                              'Por conteo',
-                              Icons.add_circle_outline,
-                              'count',
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildTypeOption(
                               'Por tiempo',
                               Icons.timer_outlined,
                               'time',
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 16),
                           Expanded(
                             child: _buildTypeOption(
                               'Hecho/Pendiente',
@@ -397,112 +568,7 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
                       const SizedBox(height: 20),
                       
                       // Campos específicos según el tipo de hábito
-                      if (_selectedType == 'count') ...[
-                        // Opciones y cantidad
-                        Row(
-                          children: [
-                            // Dropdown de opciones
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Opción',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: Colors.grey.shade300),
-                                    ),
-                                    child: DropdownButton<String>(
-                                      value: _selectedOption,
-                                      isExpanded: true,
-                                      underline: const SizedBox(),
-                                      icon: const Icon(Icons.arrow_drop_down),
-                                      items: _options.map((String option) {
-                                        return DropdownMenuItem<String>(
-                                          value: option,
-                                          child: Text(option),
-                                        );
-                                      }).toList(),
-                                      onChanged: (String? newValue) {
-                                        setState(() {
-                                          _selectedOption = newValue!;
-                                          _isGoalEnabled = newValue != 'Sin objetivo';
-                                        });
-                                      },
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            // Campo de cantidad
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Cantidad',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  TextField(
-                                    controller: _amountController,
-                                    keyboardType: TextInputType.number,
-                                    decoration: InputDecoration(
-                                      hintText: 'Cantidad',
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: BorderSide.none,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-                        
-                        // Objetivo
-                        const Text(
-                          'Objetivo',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: _goalController,
-                          enabled: _isGoalEnabled,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            hintText: 'Tu objetivo final\nEj: 145 páginas',
-                            filled: true,
-                            fillColor: _isGoalEnabled 
-                                ? Colors.white
-                                : Colors.grey.withOpacity(0.3),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                      ] else if (_selectedType == 'time') ...[
+                      if (_selectedType == 'time') ...[
                         // Opciones y tiempo
                         Row(
                           children: [
@@ -555,7 +621,7 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const Text(
-                                    'Tiempo',
+                                    'Tiempo objetivo',
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
@@ -591,6 +657,40 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
                               ),
                             ),
                           ],
+                        ),
+                        
+                        const SizedBox(height: 20),
+                        
+                        // Campo para registrar el tiempo dedicado hoy
+                        const Text(
+                          'Tiempo registrado hoy',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onTap: _showRegisteredTimePickerDialog,
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey.shade300),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  _formattedRegisteredTime,
+                                  style: const TextStyle(color: Colors.black),
+                                ),
+                                const Icon(Icons.timer, color: Color(0xFF4A90E2)),
+                              ],
+                            ),
+                          ),
                         ),
                       ],
                       
@@ -650,24 +750,11 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
                           return;
                         }
                         
-                        // Validar según el tipo de hábito
-                        if (_selectedType == 'count' && _isGoalEnabled && _goalController.text.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Por favor ingresa un objetivo')),
-                          );
-                          return;
-                        }
-                        
                         // Preparar valores según el tipo
                         dynamic goalValue;
                         dynamic currentValue;
-                        
-                        if (_selectedType == 'count') {
-                          goalValue = _isGoalEnabled ? int.tryParse(_goalController.text) ?? 0 : 0;
-                          currentValue = widget.isEditing && widget.habit?.type == 'count' 
-                              ? widget.habit!.current 
-                              : 0;
-                        } else if (_selectedType == 'time') {
+
+                        if (_selectedType == 'time') {
                           goalValue = _isGoalEnabled ? _formattedTime : '00:00:00';
                           currentValue = widget.isEditing && widget.habit?.type == 'time' 
                               ? widget.habit!.current 
@@ -680,6 +767,15 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
                         }
                         
                         // Crear o actualizar el hábito
+                        Map<String, String>? registeredTimes;
+                        if (_selectedType == 'time') {
+                          final today = DateTime.now().weekday % 7;
+                          registeredTimes = widget.isEditing && widget.habit?.registeredTimes != null 
+                              ? Map<String, String>.from(widget.habit!.registeredTimes!)
+                              : {};
+                          registeredTimes[today.toString()] = _formattedRegisteredTime;
+                        }
+                        
                         final habit = Habit(
                           id: widget.isEditing ? widget.habit!.id : DateTime.now().millisecondsSinceEpoch.toString(),
                           name: _titleController.text,
@@ -692,6 +788,10 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
                           amount: int.tryParse(_amountController.text) ?? 1,
                           days: widget.isEditing ? widget.habit!.days : [0, 0, 0, 0, 0, 0, 0],
                           createdAt: widget.isEditing ? widget.habit!.createdAt : DateTime.now(),
+                          completedDates: widget.isEditing && widget.habit!.completedDates != null 
+                              ? widget.habit!.completedDates 
+                              : {},
+                          registeredTimes: registeredTimes,
                         );
                         
                         Navigator.pop(context, habit);
@@ -731,10 +831,10 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.blue.withOpacity(0.2) : Colors.white,
+          color: isSelected ? const Color(0xFF4A90E2).withOpacity(0.2) : Colors.white,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? Colors.blue : Colors.grey.shade300,
+            color: isSelected ? const Color(0xFF4A90E2) : Colors.grey.shade300,
             width: 2,
           ),
         ),
@@ -742,7 +842,7 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
           children: [
             Icon(
               icon,
-              color: isSelected ? Colors.blue : Colors.grey,
+              color: isSelected ? const Color(0xFF4A90E2) : Colors.grey,
             ),
             const SizedBox(height: 4),
             Text(
@@ -750,6 +850,7 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? const Color(0xFF4A90E2) : Colors.black,
               ),
               textAlign: TextAlign.center,
             ),
