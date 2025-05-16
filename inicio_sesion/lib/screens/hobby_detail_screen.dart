@@ -474,7 +474,7 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
           ),
         ),
         body: Container(
-          color: const Color(0xFFD6F9F0),
+          color: const Color(0xFFE0FFFF),
           child: Column(
             children: [
               const SizedBox(height: 20),
@@ -556,7 +556,7 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.lightBlue.shade50,
+                  color: const Color(0xFFD6F9F0),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -589,7 +589,7 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
                   margin: const EdgeInsets.symmetric(horizontal: 16),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.lightBlue.shade50,
+                    color: const Color(0xFFD6F9F0),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
