@@ -20,10 +20,6 @@ class FirebaseService {
   // Colección de hábitos del usuario
   CollectionReference get _habitsCollection =>
       _firestore.collection('users').doc(userId).collection('habits');
-      
-  // Colección de hobbies del usuario
-  CollectionReference get _hobbiesCollection =>
-      _firestore.collection('users').doc(userId).collection('hobbies');
 
   // Obtener todas las tareas
   Stream<List<Task>> getTasks() {
@@ -262,6 +258,19 @@ Future<List<Habit>> getHabitsFuture() async {
     }
   }
 
+  Future<void> saveSingleUserHobby(Hobby hobby) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Usuario no autenticado');
+
+    final docRef = _firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('hobbies')
+        .doc(hobby.id);
+
+    await docRef.set(hobby.toMap());
+  }
+
   // MÉTODO PARA OBTENER LOS HOBBIES DEL USUARIO DESDE FIREBASE
   Future<List<Hobby>> getUserHobbies() async {
     final user = _auth.currentUser;
@@ -270,6 +279,20 @@ Future<List<Habit>> getHabitsFuture() async {
     final snapshot = await _firestore.collection('users').doc(user.uid).collection('hobbies').get();
 
     return snapshot.docs.map((doc) => Hobby.fromMap(doc.data())).toList();
+  }
+
+  // MÉTODO PARA ELIMINAR UN HOBBY DEL USUARIO EN FIREBASE
+  Future<void> deleteUserHobby(String hobbyId) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Usuario no autenticado');
+
+    final docRef = _firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('hobbies')
+        .doc(hobbyId);
+
+    await docRef.delete();
   }
 }
 
