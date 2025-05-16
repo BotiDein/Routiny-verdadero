@@ -1,10 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../models/task.dart';
+import '../models/task.dart'; // Importar el modelo Tarea
 import '../models/habit.dart'; // Importar el modelo Habit
+import '../models/hobby.dart'; // Importar el modelo Hobbies
 
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
   final String userId;
 
   // Constructor que acepta un userId opcional
@@ -263,19 +265,6 @@ class FirebaseService {
     return [
       Habit(
         id: '1',
-        name: 'Salir a correr',
-        category: 'Ejercicio',
-        type: 'count',
-        option: 'Al menos',
-        goal: 30,
-        current: 20,
-        amount: 5,
-        description: 'Correr al menos 30 minutos diarios',
-        days: [0, 1, 2, 1, 0, 1, 0], // 0: no registrado, 1: parcial, 2: completado
-        createdAt: DateTime.now().subtract(const Duration(days: 30)),
-      ),
-      Habit(
-        id: '2',
         name: 'Meditar',
         category: 'Salud',
         type: 'time',
@@ -287,7 +276,7 @@ class FirebaseService {
         createdAt: DateTime.now().subtract(const Duration(days: 20)),
       ),
       Habit(
-        id: '3',
+        id: '2',
         name: 'Leer',
         category: 'Educación',
         type: 'boolean',
@@ -303,59 +292,26 @@ class FirebaseService {
   
   // MÉTODOS PARA HOBBIES
   
-  // Obtener todos los hobbies
-  Future<List<Map<String, dynamic>>> getHobbies() async {
-    try {
-      final snapshot = await _hobbiesCollection.get();
-      
-      if (snapshot.docs.isEmpty) {
-        // Si no hay hobbies en Firebase, usar datos de ejemplo
-        return _getDemoHobbies();
-      }
-      
-      return snapshot.docs.map((doc) {
-        return doc.data() as Map<String, dynamic>;
-      }).toList();
-    } catch (e) {
-      print('Error al obtener hobbies: $e');
-      // En caso de error, devolver datos de ejemplo
-      return _getDemoHobbies();
+  // MÉTODO PARA GUARDAR LOS HOBBIES DEL USUARIO EN FIREBASE
+  Future<void> saveUserHobbies(List<Hobby> hobbies) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Usuario no autenticado');
+
+    final hobbiesRef = _firestore.collection('users').doc(user.uid).collection('hobbies');
+
+    for (final hobby in hobbies) {
+      await hobbiesRef.doc(hobby.id).set(hobby.toMap());
     }
   }
-  
-  // Datos de ejemplo para hobbies (en caso de que no haya datos en Firebase)
-  List<Map<String, dynamic>> _getDemoHobbies() {
-    return [
-      {
-        'id': '1',
-        'name': 'Tocar guitarra',
-        'icon': '🎸',
-        'category': 'Música',
-        'time': '03:30:00',
-        'weeklyGoal': '05:00:00',
-        'registeredTimes': [
-          {'date': '2025-4-15', 'time': '01:00:00'},
-          {'date': '2025-4-17', 'time': '01:30:00'},
-          {'date': '2025-4-19', 'time': '01:00:00'},
-        ],
-        'activeDays': [1, 3, 5], // Lunes, Miércoles, Viernes
-        'createdAt': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 45))),
-      },
-      {
-        'id': '2',
-        'name': 'Pintar',
-        'icon': '🎨',
-        'category': 'Arte',
-        'time': '02:45:00',
-        'weeklyGoal': '04:00:00',
-        'registeredTimes': [
-          {'date': '2025-4-14', 'time': '01:15:00'},
-          {'date': '2025-4-18', 'time': '01:30:00'},
-        ],
-        'activeDays': [0, 4], // Domingo, Jueves
-        'createdAt': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 30))),
-      },
-    ];
+
+  // MÉTODO PARA OBTENER LOS HOBBIES DEL USUARIO DESDE FIREBASE
+  Future<List<Hobby>> getUserHobbies() async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Usuario no autenticado');
+
+    final snapshot = await _firestore.collection('users').doc(user.uid).collection('hobbies').get();
+
+    return snapshot.docs.map((doc) => Hobby.fromMap(doc.data())).toList();
   }
 }
 

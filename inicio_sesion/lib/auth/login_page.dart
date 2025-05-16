@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../screens/main_screen.dart';
 import 'register_page.dart';
 import '../auth/landing_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -52,34 +53,51 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> loginWithGoogle() async {
+  if (!mounted) return;
+
+  try {
+    final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+    if (googleUser == null) return;
+
+    final GoogleSignInAuthentication googleAuth =
+        await googleUser.authentication;
+
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    final userCredential =
+        await FirebaseAuth.instance.signInWithCredential(credential);
+
+    final user = userCredential.user;
+    if (user == null) return;
+
+    // 🔥 Guarda el usuario en Firestore
+    final usersRef = FirebaseFirestore.instance.collection('users');
+
+    await usersRef.doc(user.uid).set({
+      'uid': user.uid,
+      'nombre': user.displayName ?? '',
+      'correo': user.email ?? '',
+      'fotoURL': user.photoURL ?? '',
+      'fechaRegistro': FieldValue.serverTimestamp(),
+      'proveedor': 'google',
+    }, SetOptions(merge: true)); // merge:true evita sobrescribir datos existentes
+
     if (!mounted) return;
 
-    try {
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const MainScreen()),
+    );
+  } catch (e) {
+    if (!mounted) return;
 
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      await FirebaseAuth.instance.signInWithCredential(credential);
-
-      if (!mounted) return;
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MainScreen()),
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() => error = 'Error con Google Sign-In: $e');
-    }
+    setState(() => error = 'Error con Google Sign-In: $e');
   }
+}
+
 
   void mostrarDialogoRecuperacion() {
     final TextEditingController correoRecuperacion = TextEditingController();

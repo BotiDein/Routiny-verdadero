@@ -40,7 +40,7 @@ class _HobbyFormScreenState extends State<HobbyFormScreen> {
       if (widget.hobby!['weeklyGoal'] != null) {
         final parts = widget.hobby!['weeklyGoal'].split(':');
         if (parts.length >= 1) {
-          _weeklyGoalController.text = parts[0].padStart(2, '0'); // Tomamos solo las horas
+          _weeklyGoalController.text = parts[0].padLeft(2, '0'); // Tomamos solo las horas
         }
       }
     }
