@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/hobby.dart';
+import '../services/firebase_service.dart';
+import '../services/local_storage_service.dart';
+
 
 class HobbyFormScreen extends StatefulWidget {
   final Map<String, dynamic>? hobby;
@@ -178,7 +181,7 @@ class _HobbyFormScreenState extends State<HobbyFormScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     if (_nameController.text.isNotEmpty) {
                       // Crear un nuevo hobby y volver a la pantalla anterior
                       final hours = _weeklyGoalController.text.isNotEmpty 
@@ -209,6 +212,10 @@ class _HobbyFormScreenState extends State<HobbyFormScreen> {
                         ),
                       );
                     }
+                  final firebaseService = FirebaseService();
+                  final localStorageService = LocalStorageService();
+                  final hobbies = await localStorageService.getHobbies();
+                  await firebaseService.saveUserHobbies(hobbies);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF0D47A1),

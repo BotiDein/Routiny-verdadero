@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/hobby.dart';
 import '../services/local_storage_service.dart';
 import 'hobby_form_screen.dart';
+import '../services/firebase_service.dart';
 
 class HobbyDetailScreen extends StatefulWidget {
   final Hobby hobby;
@@ -27,6 +28,22 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
   // Días con actividad (0 = domingo, 6 = sábado)
   List<int> _activeDays = []; // Inicializada como vacía
 
+  // Actualiza solo el hobby que acabas de modificar
+  Future<void> _syncWithFirebase() async {
+    final firebaseService = FirebaseService();
+    // En vez de traer todos y subirlos, sube solo el actualizado:
+    final updatedHobby = Hobby(
+      id: widget.hobby.id,
+      name: widget.hobby.name,
+      icon: widget.hobby.icon,
+      time: _totalTime,
+      weeklyGoal: _weeklyGoal,
+      registeredTimes: _registeredTimes,
+      activeDays: _activeDays,
+    );
+    await firebaseService.saveSingleUserHobby(updatedHobby);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -41,13 +58,12 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
   }
 
   void _startTimer() {
-    // Navegar a la pantalla del cronómetro integrada
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => StopwatchScreen(hobby: widget.hobby),
       ),
-    ).then((result) {
+    ).then((result) async {
       // Procesar el resultado cuando vuelva de la pantalla del cronómetro
       if (result != null && result is String) {
         // Convertir el formato del cronómetro (MM:SS.CC) a formato de tiempo (HH:MM:SS)
@@ -55,29 +71,27 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
         if (parts.length == 2) {
           final minutesPart = parts[0];
           final secondsPart = parts[1].split('.')[0];
-
           final formattedTime = '00:$minutesPart:$secondsPart';
 
-          setState(() {
-            _registeredTimes.add({
-              'date': DateTime.now(),
-              'time': formattedTime,
-            });
-            
-            // Actualizar días activos
-            final today = DateTime.now().weekday % 7;
-            if (!_activeDays.contains(today)) {
-              _activeDays.add(today);
-            }
-            
-            // Actualizar tiempo total
-            _calculateTotalTime();
-            // Verificar si se cumplió la meta
-            _checkGoalCompletion();
-            
-            // Actualizar el hobby y guardarlo
-            _updateAndSaveHobby();
+          // 1. Actualizar datos locales
+          _registeredTimes.add({
+            'date': DateTime.now(),
+            'time': formattedTime,
           });
+
+          final today = DateTime.now().weekday % 7;
+          if (!_activeDays.contains(today)) {
+            _activeDays.add(today);
+          }
+
+          _calculateTotalTime();
+          _checkGoalCompletion();
+
+          // 2. Guardar cambios
+          await _updateAndSaveHobby(); // Esto ya incluye guardar local y Firebase
+
+          // 3. Actualizar UI (si es necesario)
+          setState(() {});
         }
       }
     });
@@ -220,43 +234,46 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
               },
               child: const Text('Cancelar'),
             ),
-            TextButton(
-              onPressed: () {
-                // Registrar el tiempo
-                final newTime =
+              TextButton(
+                onPressed: () async {
+                  // 1. Construir el nuevo registro de tiempo
+                  final newTime =
                     '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-                setState(() {
+
+                  // 2. Actualizar datos locales
                   _registeredTimes.add({
                     'date': DateTime.now(),
                     'time': newTime,
                   });
-                  
-                  // Actualizar días activos
+
                   final today = DateTime.now().weekday % 7;
                   if (!_activeDays.contains(today)) {
                     _activeDays.add(today);
                   }
-                  
-                  // Actualizar tiempo total
+
                   _calculateTotalTime();
-                  // Verificar si se cumplió la meta
                   _checkGoalCompletion();
-                  
-                  // Actualizar el hobby y guardarlo
-                  _updateAndSaveHobby();
-                });
-                Navigator.of(context).pop();
-              },
-              child: const Text('Guardar'),
-            ),
+
+                  // 3. Guardar en storage local y en Firebase
+                  await _updateAndSaveHobby(); // <- Usa await para esperar que se complete
+
+                  // 4. Actualizar UI
+                  setState(() {});
+
+                  // 5. Cerrar el diálogo
+                  Navigator.of(context).pop();
+                },
+                child: const Text('Guardar'),
+              ),
+
           ],
         );
       },
     );
   }
 
-  // Actualizar el hobby y guardarlo
-  void _updateAndSaveHobby() {
+// Actualizar el hobby y guardarlo
+  Future<void> _updateAndSaveHobby() async {
     final updatedHobby = Hobby(
       id: widget.hobby.id,
       name: widget.hobby.name,
@@ -267,7 +284,11 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
       activeDays: _activeDays,
     );
     
-    _storageService.updateHobby(updatedHobby);
+    // 1) Espera a que se actualice localmente
+    await _storageService.updateHobby(updatedHobby);
+    
+    // 2) Luego sincroniza con Firebase
+    await _syncWithFirebase();
   }
 
   // Convertir tiempo en formato HH:MM:SS a segundos
@@ -376,17 +397,26 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop();
+                Navigator.of(context).pop(); // Cerrar diálogo de confirmación
               },
               child: const Text('Cancelar'),
             ),
             TextButton(
               onPressed: () async {
                 try {
+                  // 1. Eliminar localmente
                   await _storageService.deleteHobby(widget.hobby.id);
-                  Navigator.of(context).pop(); // Cerrar el diálogo
-                  Navigator.of(context).pop(true); // Volver a la pantalla anterior con resultado true para indicar eliminación
+
+                  // 2. Eliminar de Firebase
+                  final firebaseService = FirebaseService();
+                  await firebaseService.deleteUserHobby(widget.hobby.id);
+
+                  // 3. Cerrar ambos contextos
+                  Navigator.of(context).pop(); // Cierra el diálogo
+                  Navigator.of(context).pop(true); // Retorna a la pantalla anterior
+
                 } catch (e) {
+                  Navigator.of(context).pop(); // Cierra el diálogo si falla
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Error al eliminar: $e')),
                   );
@@ -400,6 +430,7 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
       },
     );
   }
+
 
   @override
   Widget build(BuildContext context) {

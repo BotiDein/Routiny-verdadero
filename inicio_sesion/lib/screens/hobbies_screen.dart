@@ -3,6 +3,7 @@ import '../models/hobby.dart';
 import '../services/local_storage_service.dart';
 import 'hobby_form_screen.dart';
 import 'hobby_detail_screen.dart';
+import '../services/firebase_service.dart';
 
 // Clase singleton para mantener los datos de los hobbies
 class HobbiesData {
@@ -44,15 +45,25 @@ class _HobbiesScreenState extends State<HobbiesScreen> {
     setState(() {
       _isLoading = true;
     });
-    
+
     try {
-      final hobbies = await _storageService.getHobbies();
+      final firebaseService = FirebaseService();
+
+      // 1. Obtener desde Firebase
+      final firebaseHobbies = await firebaseService.getUserHobbies();
+
+      // 2. Guardar en almacenamiento local
+      await _storageService.saveHobbies(firebaseHobbies);
+
+      // 3. Leer localmente y mostrar
+      final localHobbies = await _storageService.getHobbies();
+
       setState(() {
-        _hobbies = hobbies;
+        _hobbies = localHobbies;
         _isLoading = false;
       });
     } catch (e) {
-      print('Error al cargar hobbies: $e');
+      print('Error al cargar hobbies desde Firebase: $e');
       setState(() {
         _isLoading = false;
       });
@@ -91,18 +102,24 @@ class _HobbiesScreenState extends State<HobbiesScreen> {
                         final hobby = _hobbies[index];
                         return InkWell(
                           onTap: () {
-                            // Navegar a la pantalla de detalles del hobby
                             Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => HobbyDetailScreen(hobby: hobby),
                               ),
-                            ).then((updatedHobby) {
-                              if (updatedHobby != null && updatedHobby is Hobby) {
+                            ).then((result) async {
+                              if (result == true) {
+                                // El hobby fue eliminado
+                                final updatedHobbies = await _storageService.getHobbies();
                                 setState(() {
-                                  _hobbies[index] = updatedHobby;
-                                  _storageService.updateHobby(updatedHobby);
+                                  _hobbies = updatedHobbies;
                                 });
+                              } else if (result != null && result is Hobby) {
+                                // El hobby fue editado
+                                setState(() {
+                                  _hobbies[index] = result;
+                                });
+                                _storageService.updateHobby(result);
                               }
                             });
                           },

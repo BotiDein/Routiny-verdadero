@@ -27,12 +27,9 @@ class Hobby {
       'icon': icon,
       'time': time,
       'weeklyGoal': weeklyGoal,
-      'registeredTimes': registeredTimes.map((timeEntry) {
-        final Map<String, dynamic> serializedEntry = Map.from(timeEntry);
-        if (serializedEntry['date'] is DateTime) {
-          serializedEntry['date'] = (serializedEntry['date'] as DateTime).toIso8601String();
-        }
-        return serializedEntry;
+      'registeredTimes': registeredTimes.map((e) => {
+        'date': (e['date'] as DateTime).toIso8601String(),
+        'time': e['time'],
       }).toList(),
       'activeDays': activeDays,
     };
@@ -43,26 +40,19 @@ class Hobby {
 
   // Crear Hobby desde Map
   factory Hobby.fromMap(Map<String, dynamic> map) {
-    // Procesar registeredTimes
-    List<Map<String, dynamic>> processedTimes = [];
-    if (map['registeredTimes'] != null) {
-      processedTimes = (map['registeredTimes'] as List).map((timeEntry) {
-        final Map<String, dynamic> entry = Map<String, dynamic>.from(timeEntry);
-        if (entry['date'] is String) {
-          entry['date'] = DateTime.parse(entry['date']);
-        }
-        return entry;
-      }).cast<Map<String, dynamic>>().toList();
-    }
-
     return Hobby(
-      id: map['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      name: map['name'] ?? '',
-      icon: map['icon'] ?? '😊',
-      time: map['time'] ?? '00:00:00',
-      weeklyGoal: map['weeklyGoal'] ?? '05:00:00',
-      registeredTimes: processedTimes,
-      activeDays: List<int>.from(map['activeDays'] ?? []),
+      id: map['id'],
+      name: map['name'],
+      icon: map['icon'],
+      time: map['time'],
+      weeklyGoal: map['weeklyGoal'],
+      registeredTimes: (map['registeredTimes'] as List)
+          .map((e) => {
+                'date': DateTime.parse(e['date']),
+                'time': e['time'],
+              })
+          .toList(),
+      activeDays: List<int>.from(map['activeDays']),
     );
   }
 
