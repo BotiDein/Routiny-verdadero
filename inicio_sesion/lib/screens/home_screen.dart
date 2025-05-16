@@ -50,23 +50,45 @@ class _HomeScreenState extends State<HomeScreen> {
       DateTime.now().day,
     );
 
-    _firebaseService.getTasksByDate(today).listen(
-      (tasks) {
-        if (mounted) {
-          setState(() {
-            _todayTasks = tasks;
-            _isLoadingToday = false;
-          });
-        }
-      },
-      onError: (_) {
-        if (mounted) {
-          setState(() {
-            _isLoadingToday = false;
-          });
-        }
-      },
-    );
+    _firebaseService
+        .getTasksByDate(today)
+        .listen(
+          (tasks) {
+            if (mounted) {
+              setState(() {
+                // Ordenar tareas por prioridad (alta a baja) y hora, con completadas al final
+                tasks.sort((a, b) {
+                  // Primero mover las tareas completadas al final
+                  if (a.isCompleted && !b.isCompleted) return 1;
+                  if (!a.isCompleted && b.isCompleted) return -1;
+
+                  // Si ambas tienen el mismo estado de completado, ordenar por prioridad
+                  if (a.isCompleted == b.isCompleted) {
+                    // Ordenar por prioridad (3: alta, 2: media, 1: baja)
+                    if (a.priority != b.priority) {
+                      // Orden descendente para que la prioridad alta (3) aparezca primero
+                      return b.priority.compareTo(a.priority);
+                    }
+                    // Si tienen la misma prioridad, ordenar por hora
+                    return a.date.compareTo(b.date);
+                  }
+
+                  return 0;
+                });
+
+                _todayTasks = tasks;
+                _isLoadingToday = false;
+              });
+            }
+          },
+          onError: (_) {
+            if (mounted) {
+              setState(() {
+                _isLoadingToday = false;
+              });
+            }
+          },
+        );
   }
 
   void _loadTomorrowTasks() {
@@ -76,23 +98,45 @@ class _HomeScreenState extends State<HomeScreen> {
       _isLoadingTomorrow = true;
     });
 
-    _firebaseService.getTasksByDate(_tomorrow).listen(
-      (tasks) {
-        if (mounted) {
-          setState(() {
-            _tomorrowTasks = tasks;
-            _isLoadingTomorrow = false;
-          });
-        }
-      },
-      onError: (_) {
-        if (mounted) {
-          setState(() {
-            _isLoadingTomorrow = false;
-          });
-        }
-      },
-    );
+    _firebaseService
+        .getTasksByDate(_tomorrow)
+        .listen(
+          (tasks) {
+            if (mounted) {
+              setState(() {
+                // Ordenar tareas por prioridad (alta a baja) y hora, con completadas al final
+                tasks.sort((a, b) {
+                  // Primero mover las tareas completadas al final
+                  if (a.isCompleted && !b.isCompleted) return 1;
+                  if (!a.isCompleted && b.isCompleted) return -1;
+
+                  // Si ambas tienen el mismo estado de completado, ordenar por prioridad
+                  if (a.isCompleted == b.isCompleted) {
+                    // Ordenar por prioridad (3: alta, 2: media, 1: baja)
+                    if (a.priority != b.priority) {
+                      // Orden descendente para que la prioridad alta (3) aparezca primero
+                      return b.priority.compareTo(a.priority);
+                    }
+                    // Si tienen la misma prioridad, ordenar por hora
+                    return a.date.compareTo(b.date);
+                  }
+
+                  return 0;
+                });
+
+                _tomorrowTasks = tasks;
+                _isLoadingTomorrow = false;
+              });
+            }
+          },
+          onError: (_) {
+            if (mounted) {
+              setState(() {
+                _isLoadingTomorrow = false;
+              });
+            }
+          },
+        );
   }
 
   @override
@@ -112,9 +156,7 @@ class _HomeScreenState extends State<HomeScreen> {
             // Contenedor de tareas para hoy
             Container(
               width: scaleWidth(486),
-              constraints: BoxConstraints(
-                minHeight: scaleHeight(280),
-              ),
+              constraints: BoxConstraints(minHeight: scaleHeight(280)),
               decoration: BoxDecoration(
                 color: Color(0xFFBDFFF9),
                 borderRadius: BorderRadius.circular(12),
@@ -146,105 +188,118 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   Padding(
                     padding: EdgeInsets.all(scaleWidth(16)),
-                    child: _isLoadingToday
-                        ? Center(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(
-                                  vertical: scaleHeight(20)),
-                              child: const CircularProgressIndicator(),
-                            ),
-                          )
-                        : _todayTasks.isEmpty
-                            ? Padding(
+                    child:
+                        _isLoadingToday
+                            ? Center(
+                              child: Padding(
                                 padding: EdgeInsets.symmetric(
-                                    vertical: scaleHeight(20)),
-                                child: Text(
-                                  'No hay tareas para hoy',
-                                  style: TextStyle(
-                                    fontSize: scaleHeight(24),
-                                    fontStyle: FontStyle.italic,
-                                  ),
+                                  vertical: scaleHeight(20),
                                 ),
-                              )
+                                child: const CircularProgressIndicator(),
+                              ),
+                            )
+                            : _todayTasks.isEmpty
+                            ? Padding(
+                              padding: EdgeInsets.symmetric(
+                                vertical: scaleHeight(20),
+                              ),
+                              child: Text(
+                                'No hay tareas para hoy',
+                                style: TextStyle(
+                                  fontSize: scaleHeight(24),
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            )
                             : Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: _todayTasks.take(5).map((task) {
-                                  return Padding(
-                                    padding:
-                                        EdgeInsets.only(bottom: scaleHeight(8)),
-                                    child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Container(
-                                          width: scaleHeight(20),
-                                          height: scaleHeight(20),
-                                          margin: EdgeInsets.only(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children:
+                                  _todayTasks.take(5).map((task) {
+                                    return Padding(
+                                      padding: EdgeInsets.only(
+                                        bottom: scaleHeight(8),
+                                      ),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Container(
+                                            width: scaleHeight(20),
+                                            height: scaleHeight(20),
+                                            margin: EdgeInsets.only(
                                               top: scaleHeight(5),
-                                              right: scaleWidth(6)),
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: _getPriorityColor(
-                                                task.priority),
-                                          ),
-                                        ),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                task.title,
-                                                style: TextStyle(
-                                                  fontSize: scaleHeight(28),
-                                                  fontWeight: FontWeight.w600,
-                                                  decoration: task.isCompleted
-                                                      ? TextDecoration
-                                                          .lineThrough
-                                                      : null,
-                                                  color: task.isCompleted
-                                                      ? Colors.grey
-                                                      : Colors.black,
-                                                ),
+                                              right: scaleWidth(6),
+                                            ),
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: _getPriorityColor(
+                                                task.priority,
                                               ),
-                                              if (task.description.isNotEmpty)
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
                                                 Text(
-                                                  task.description,
+                                                  task.title,
                                                   style: TextStyle(
-                                                    fontSize: scaleHeight(20),
-                                                    color: Colors.grey[700],
+                                                    fontSize: scaleHeight(28),
+                                                    fontWeight: FontWeight.w600,
+                                                    decoration:
+                                                        task.isCompleted
+                                                            ? TextDecoration
+                                                                .lineThrough
+                                                            : null,
+                                                    color:
+                                                        task.isCompleted
+                                                            ? Colors.grey
+                                                            : Colors.black,
                                                   ),
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
                                                 ),
-                                              Row(
-                                                children: [
-                                                  Icon(
-                                                    Icons.access_time,
-                                                    size: scaleHeight(18),
-                                                    color: Colors.grey[600],
-                                                  ),
-                                                  SizedBox(
-                                                      width: scaleWidth(4)),
+                                                if (task.description.isNotEmpty)
                                                   Text(
-                                                    DateFormat('HH:mm')
-                                                        .format(task.date),
+                                                    task.description,
                                                     style: TextStyle(
-                                                      fontSize: scaleHeight(18),
+                                                      fontSize: scaleHeight(20),
+                                                      color: Colors.grey[700],
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.access_time,
+                                                      size: scaleHeight(18),
                                                       color: Colors.grey[600],
                                                     ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
+                                                    SizedBox(
+                                                      width: scaleWidth(4),
+                                                    ),
+                                                    Text(
+                                                      DateFormat(
+                                                        'HH:mm',
+                                                      ).format(task.date),
+                                                      style: TextStyle(
+                                                        fontSize: scaleHeight(
+                                                          18,
+                                                        ),
+                                                        color: Colors.grey[600],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                            ),
                   ),
                 ],
               ),
@@ -255,9 +310,7 @@ class _HomeScreenState extends State<HomeScreen> {
             // Contenedor de tareas para mañana
             Container(
               width: scaleWidth(486),
-              constraints: BoxConstraints(
-                minHeight: scaleHeight(280),
-              ),
+              constraints: BoxConstraints(minHeight: scaleHeight(280)),
               decoration: BoxDecoration(
                 color: Color(0xFFBDFFF9),
                 borderRadius: BorderRadius.circular(12),
@@ -290,64 +343,71 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   Padding(
                     padding: EdgeInsets.all(scaleWidth(16)),
-                    child: _isLoadingTomorrow
-                        ? Center(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(
-                                  vertical: scaleHeight(20)),
-                              child: const CircularProgressIndicator(),
-                            ),
-                          )
-                        : _tomorrowTasks.isEmpty
-                            ? Padding(
+                    child:
+                        _isLoadingTomorrow
+                            ? Center(
+                              child: Padding(
                                 padding: EdgeInsets.symmetric(
-                                    vertical: scaleHeight(20)),
-                                child: Text(
-                                  'No hay tareas para mañana',
-                                  style: TextStyle(
-                                    fontSize: scaleHeight(24),
-                                    fontStyle: FontStyle.italic,
-                                  ),
+                                  vertical: scaleHeight(20),
                                 ),
-                              )
-                            : Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: _tomorrowTasks.take(3).map((task) {
-                                  return Padding(
-                                    padding:
-                                        EdgeInsets.only(bottom: scaleHeight(8)),
-                                    child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Container(
-                                          width: scaleHeight(20),
-                                          height: scaleHeight(20),
-                                          margin: EdgeInsets.only(
-                                              top: scaleHeight(5),
-                                              right: scaleWidth(6)),
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: _getPriorityColor(
-                                                task.priority),
-                                          ),
-                                        ),
-                                        Expanded(
-                                          child: Text(
-                                            task.title,
-                                            style: TextStyle(
-                                              fontSize: scaleHeight(28),
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
+                                child: const CircularProgressIndicator(),
                               ),
+                            )
+                            : _tomorrowTasks.isEmpty
+                            ? Padding(
+                              padding: EdgeInsets.symmetric(
+                                vertical: scaleHeight(20),
+                              ),
+                              child: Text(
+                                'No hay tareas para mañana',
+                                style: TextStyle(
+                                  fontSize: scaleHeight(24),
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            )
+                            : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children:
+                                  _tomorrowTasks.take(3).map((task) {
+                                    return Padding(
+                                      padding: EdgeInsets.only(
+                                        bottom: scaleHeight(8),
+                                      ),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Container(
+                                            width: scaleHeight(20),
+                                            height: scaleHeight(20),
+                                            margin: EdgeInsets.only(
+                                              top: scaleHeight(5),
+                                              right: scaleWidth(6),
+                                            ),
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: _getPriorityColor(
+                                                task.priority,
+                                              ),
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: Text(
+                                              task.title,
+                                              style: TextStyle(
+                                                fontSize: scaleHeight(28),
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                            ),
                   ),
                 ],
               ),
@@ -369,7 +429,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (context) => const ResumenPersonalScreen()),
+                      builder: (context) => const ResumenPersonalScreen(),
+                    ),
                   );
                 },
                 child: Text(

@@ -73,13 +73,15 @@ class _AgendaScreenState extends State<AgendaScreen> {
   Future<void> _deleteTask(Task task) async {
     // Guardar la tarea antes de eliminarla para poder restaurarla
     _lastDeletedTask = task;
-    
+
     try {
       await _firebaseService.deleteTask(task.id);
-      
+
       // Mostrar SnackBar con opción de deshacer
       if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars(); // Limpiar SnackBars anteriores
+        ScaffoldMessenger.of(
+          context,
+        ).clearSnackBars(); // Limpiar SnackBars anteriores
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Tarea eliminada'),
@@ -89,7 +91,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
                 _undoDelete();
               },
             ),
-            duration: const Duration(seconds: 5), // Dar tiempo suficiente para deshacer
+            duration: const Duration(
+              seconds: 5,
+            ), // Dar tiempo suficiente para deshacer
           ),
         );
       }
@@ -108,13 +112,13 @@ class _AgendaScreenState extends State<AgendaScreen> {
       try {
         // Restaurar la tarea eliminada
         await _firebaseService.addTask(_lastDeletedTask!);
-        
+
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Tarea restaurada')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Tarea restaurada')));
         }
-        
+
         // Limpiar la referencia a la tarea eliminada
         _lastDeletedTask = null;
       } catch (e) {
@@ -259,17 +263,115 @@ class _AgendaScreenState extends State<AgendaScreen> {
       sections.add(_buildDateSection(sectionTitle, headerFontSize));
       sections.add(SizedBox(height: screenHeight * 0.015));
 
-      // Añadir las tareas para esta fecha
-      for (var task in _tasksByDate[dateKey]!) {
+      // Ordenar las tareas para esta fecha por prioridad (alta, media, baja) y hora
+      // y mover las completadas al final
+      final tasksForDate = List<Task>.from(_tasksByDate[dateKey]!);
+      tasksForDate.sort((a, b) {
+        // Primero mover las tareas completadas al final
+        if (a.isCompleted && !b.isCompleted) return 1;
+        if (!a.isCompleted && b.isCompleted) return -1;
+
+        // Si ambas tienen el mismo estado de completado, ordenar por prioridad
+        if (a.isCompleted == b.isCompleted) {
+          // Ordenar por prioridad (3: alta, 2: media, 1: baja)
+          if (a.priority != b.priority) {
+            // Orden descendente para que la prioridad alta (3) aparezca primero
+            return b.priority.compareTo(a.priority);
+          }
+          // Si tienen la misma prioridad, ordenar por hora
+          return a.date.compareTo(b.date);
+        }
+
+        return 0;
+      });
+
+      // Agrupar tareas por prioridad
+      final highPriorityTasks =
+          tasksForDate.where((t) => !t.isCompleted && t.priority == 3).toList();
+      final mediumPriorityTasks =
+          tasksForDate.where((t) => !t.isCompleted && t.priority == 2).toList();
+      final lowPriorityTasks =
+          tasksForDate.where((t) => !t.isCompleted && t.priority == 1).toList();
+      final completedTasks = tasksForDate.where((t) => t.isCompleted).toList();
+
+      // Añadir encabezado y tareas de prioridad alta si hay alguna
+      if (highPriorityTasks.isNotEmpty) {
         sections.add(
-          _buildTaskItem(
-            task: task,
-            bodyFontSize: bodyFontSize,
-            smallFontSize: smallFontSize,
-            iconSize: mediumIconSize,
-          ),
+          _buildPriorityHeader('Prioridad Alta', Colors.red, bodyFontSize),
         );
-        sections.add(SizedBox(height: screenHeight * 0.02));
+        sections.add(SizedBox(height: screenHeight * 0.01));
+
+        for (var task in highPriorityTasks) {
+          sections.add(
+            _buildTaskItem(
+              task: task,
+              bodyFontSize: bodyFontSize,
+              smallFontSize: smallFontSize,
+              iconSize: mediumIconSize,
+            ),
+          );
+          sections.add(SizedBox(height: screenHeight * 0.02));
+        }
+      }
+
+      // Añadir encabezado y tareas de prioridad media si hay alguna
+      if (mediumPriorityTasks.isNotEmpty) {
+        sections.add(
+          _buildPriorityHeader('Prioridad Media', Colors.orange, bodyFontSize),
+        );
+        sections.add(SizedBox(height: screenHeight * 0.01));
+
+        for (var task in mediumPriorityTasks) {
+          sections.add(
+            _buildTaskItem(
+              task: task,
+              bodyFontSize: bodyFontSize,
+              smallFontSize: smallFontSize,
+              iconSize: mediumIconSize,
+            ),
+          );
+          sections.add(SizedBox(height: screenHeight * 0.02));
+        }
+      }
+
+      // Añadir encabezado y tareas de prioridad baja si hay alguna
+      if (lowPriorityTasks.isNotEmpty) {
+        sections.add(
+          _buildPriorityHeader('Prioridad Baja', Colors.green, bodyFontSize),
+        );
+        sections.add(SizedBox(height: screenHeight * 0.01));
+
+        for (var task in lowPriorityTasks) {
+          sections.add(
+            _buildTaskItem(
+              task: task,
+              bodyFontSize: bodyFontSize,
+              smallFontSize: smallFontSize,
+              iconSize: mediumIconSize,
+            ),
+          );
+          sections.add(SizedBox(height: screenHeight * 0.02));
+        }
+      }
+
+      // Añadir encabezado y tareas completadas si hay alguna
+      if (completedTasks.isNotEmpty) {
+        sections.add(
+          _buildPriorityHeader('Completadas', Colors.grey, bodyFontSize),
+        );
+        sections.add(SizedBox(height: screenHeight * 0.01));
+
+        for (var task in completedTasks) {
+          sections.add(
+            _buildTaskItem(
+              task: task,
+              bodyFontSize: bodyFontSize,
+              smallFontSize: smallFontSize,
+              iconSize: mediumIconSize,
+            ),
+          );
+          sections.add(SizedBox(height: screenHeight * 0.02));
+        }
       }
 
       // Añadir espacio entre secciones
@@ -292,6 +394,30 @@ class _AgendaScreenState extends State<AgendaScreen> {
         date,
         textAlign: TextAlign.center,
         style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  // Método para construir los encabezados de prioridad
+  Widget _buildPriorityHeader(String title, Color color, double fontSize) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        vertical: fontSize * 0.5,
+        horizontal: fontSize * 0.7,
+      ),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(fontSize * 0.5),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: fontSize * 0.9,
+          fontWeight: FontWeight.bold,
+          color: color,
+        ),
       ),
     );
   }
