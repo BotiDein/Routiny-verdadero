@@ -5,7 +5,8 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
-  //Hola
+import 'services/simple_notification_service.dart';
+
 void main() async {
   // Aseguramos que Flutter esté inicializado
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,6 +34,9 @@ void main() async {
         : DefaultFirebaseOptions.currentPlatform,
   );
   
+  // Inicializar el servicio de notificaciones simplificado
+  await SimpleNotificationService().init();
+  
   runApp(const MyApp());
 }
 
@@ -45,10 +49,10 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Routiny',
       theme: ThemeData(
-      primaryColor: const Color(0xFF4A90E2),
-      scaffoldBackgroundColor: const Color(0xFFE0FFFF),
-      useMaterial3: true,
-    ),
+        primaryColor: const Color(0xFF4A90E2),
+        scaffoldBackgroundColor: const Color(0xFFE0FFFF),
+        useMaterial3: true,
+      ),
       home: const SplashScreen(),
     );
   }
