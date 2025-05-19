@@ -44,7 +44,7 @@ class _ResumenPersonalScreenState extends State<ResumenPersonalScreen> {
   Map<int, int> _activityByDay = {};
   Map<int, int> _tasksByDay = {};
   Map<int, int> _habitsByDay = {};
-  List<FlSpot> _activitySpots = []; // Añadir esta línea
+  final List<FlSpot> _activitySpots = []; // Añadir esta línea
   
   @override
   void initState() {

@@ -89,21 +89,19 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
       }
 
       // Cargar el tiempo registrado para hoy si existe
-      if (widget.habit!.registeredTimes != null) {
-        final today = DateTime.now().weekday % 7;
-        if (widget.habit!.registeredTimes!.containsKey(today.toString())) {
-          final regTime = widget.habit!.registeredTimes![today.toString()];
-          if (regTime != null) {
-            final timeParts = regTime.split(':');
-            if (timeParts.length == 3) {
-              _regHours = int.tryParse(timeParts[0]) ?? 0;
-              _regMinutes = int.tryParse(timeParts[1]) ?? 0;
-              _regSeconds = int.tryParse(timeParts[2]) ?? 0;
-            }
+      final today = DateTime.now().weekday % 7;
+      if (widget.habit!.registeredTimes!.containsKey(today.toString())) {
+        final regTime = widget.habit!.registeredTimes![today.toString()];
+        if (regTime != null) {
+          final timeParts = regTime.split(':');
+          if (timeParts.length == 3) {
+            _regHours = int.tryParse(timeParts[0]) ?? 0;
+            _regMinutes = int.tryParse(timeParts[1]) ?? 0;
+            _regSeconds = int.tryParse(timeParts[2]) ?? 0;
           }
         }
       }
-    }
+        }
   }
 
   @override
@@ -771,7 +769,7 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
                         if (_selectedType == 'time') {
                           final today = DateTime.now().weekday % 7;
                           registeredTimes = widget.isEditing && widget.habit?.registeredTimes != null 
-                              ? Map<String, String>.from(widget.habit!.registeredTimes!)
+                              ? Map<String, String>.from(widget.habit!.registeredTimes)
                               : {};
                           registeredTimes[today.toString()] = _formattedRegisteredTime;
                         }
@@ -788,7 +786,7 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
                           amount: int.tryParse(_amountController.text) ?? 1,
                           days: widget.isEditing ? widget.habit!.days : [0, 0, 0, 0, 0, 0, 0],
                           createdAt: widget.isEditing ? widget.habit!.createdAt : DateTime.now(),
-                          completedDates: widget.isEditing && widget.habit!.completedDates != null 
+                          completedDates: widget.isEditing 
                               ? widget.habit!.completedDates 
                               : {},
                           registeredTimes: registeredTimes,

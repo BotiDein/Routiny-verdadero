@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../auth/landing_page.dart';
+import 'notification_settings_screen.dart';
+import '../services/notification_manager.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -14,9 +16,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late double screenWidth;
   late double screenHeight;
   late ScaffoldMessengerState _messenger;
+  final NotificationManager _notificationManager = NotificationManager();
+  int _currentStreak = 0;
+  bool _isLoadingStreak = true;
 
   double scaleWidth(double value) => value * screenWidth / 720;
   double scaleHeight(double value) => value * screenHeight / 1280;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStreak();
+  }
+
+  Future<void> _loadStreak() async {
+    setState(() {
+      _isLoadingStreak = true;
+    });
+    
+    final streak = await _notificationManager.getCurrentStreak();
+    
+    setState(() {
+      _currentStreak = streak;
+      _isLoadingStreak = false;
+    });
+  }
 
   @override
   void didChangeDependencies() {
@@ -58,6 +82,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Sección de racha
+            if (!_isLoadingStreak && _currentStreak > 0) _buildStreakSection(),
+            
+            if (!_isLoadingStreak && _currentStreak > 0) SizedBox(height: scaleHeight(20)),
+            
+            _buildConfigItem(
+              Icons.notifications,
+              'Notificaciones',
+              optionFontSize,
+              () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const NotificationSettingsScreen(),
+                ),
+              ),
+            ),
+            SizedBox(height: scaleHeight(20)),
             _buildConfigItem(
               Icons.person,
               'Mi cuenta',
@@ -87,6 +128,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildStreakSection() {
+    return Container(
+      padding: EdgeInsets.all(scaleWidth(20)),
+      margin: EdgeInsets.only(bottom: scaleHeight(10)),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE0FFFF),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.local_fire_department,
+            color: Colors.orange,
+            size: scaleWidth(50),
+          ),
+          SizedBox(width: scaleWidth(15)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Tu racha actual',
+                style: TextStyle(
+                  fontSize: screenWidth * 0.04,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+              Text(
+                '$_currentStreak días consecutivos',
+                style: TextStyle(
+                  fontSize: screenWidth * 0.05,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF0047AB),
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

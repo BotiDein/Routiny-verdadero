@@ -30,8 +30,8 @@ class Habit {
     required this.createdAt,
     Map<String, int>? completedDates,
     Map<String, String>? registeredTimes,
-  })  : this.completedDates = completedDates ?? {},
-        this.registeredTimes = registeredTimes ?? {};
+  })  : completedDates = completedDates ?? {},
+        registeredTimes = registeredTimes ?? {};
 
   Habit copyWith({
     String? id,

@@ -1,13 +1,15 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../models/task.dart'; // Importar el modelo Tarea
-import '../models/habit.dart'; // Importar el modelo Habit
-import '../models/hobby.dart'; // Importar el modelo Hobbies
+import '../models/task.dart';
+import '../models/habit.dart';
+import '../models/hobby.dart';
+import 'notification_manager.dart';
 
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final String userId;
+  final NotificationManager _notificationManager = NotificationManager();
 
   // Constructor que acepta un userId opcional
   FirebaseService([String? uid])
@@ -69,23 +71,46 @@ class FirebaseService {
   }
 
   // Añadir una tarea
-  Future<void> addTask(Task task) {
-    return _tasksCollection.doc(task.id).set(task.toMap());
+  Future<void> addTask(Task task) async {
+    await _tasksCollection.doc(task.id).set(task.toMap());
+    
+    // Programar notificación para la nueva tarea
+    await _notificationManager.scheduleTaskNotification(task);
   }
 
   // Actualizar una tarea
-  Future<void> updateTask(Task task) {
-    return _tasksCollection.doc(task.id).update(task.toMap());
+  Future<void> updateTask(Task task) async {
+    await _tasksCollection.doc(task.id).update(task.toMap());
+    
+    // Programar o cancelar notificación según el estado
+    if (task.isCompleted) {
+      // Cancelar notificación si la tarea está completada
+      await _notificationManager.cancelAllNotifications();
+      
+      // Actualizar racha
+      await _notificationManager.updateStreak();
+    } else {
+      // Programar notificación si la tarea no está completada
+      await _notificationManager.scheduleTaskNotification(task);
+    }
   }
 
   // Eliminar una tarea
-  Future<void> deleteTask(String taskId) {
-    return _tasksCollection.doc(taskId).delete();
+  Future<void> deleteTask(String taskId) async {
+    await _tasksCollection.doc(taskId).delete();
+    
+    // Cancelar notificación para esta tarea
+    await _notificationManager.cancelAllNotifications();
   }
 
   // Marcar tarea como completada
-  Future<void> toggleTaskCompletion(String taskId, bool isCompleted) {
-    return _tasksCollection.doc(taskId).update({'isCompleted': isCompleted});
+  Future<void> toggleTaskCompletion(String taskId, bool isCompleted) async {
+    await _tasksCollection.doc(taskId).update({'isCompleted': isCompleted});
+    
+    // Si se marca como completada, actualizar racha
+    if (isCompleted) {
+      await _notificationManager.updateStreak();
+    }
   }
 
   // Obtener fechas con tareas para un mes específico
@@ -180,6 +205,9 @@ Future<List<Habit>> getHabitsFuture() async {
   Future<void> addHabit(Habit habit) async {
     try {
       await _habitsCollection.doc(habit.id).set(habit.toMap());
+      
+      // Programar notificaciones de hábitos si es necesario
+      await _notificationManager.scheduleHabitReminders();
     } catch (e) {
       print('Error al añadir hábito: $e');
       throw Exception('No se pudo añadir el hábito: $e');
@@ -190,6 +218,13 @@ Future<List<Habit>> getHabitsFuture() async {
   Future<void> updateHabit(Habit habit) async {
     try {
       await _habitsCollection.doc(habit.id).update(habit.toMap());
+      
+      // Verificar si se completó un hábito hoy
+      final today = DateTime.now().weekday % 7; // 0-6 (0 = domingo)
+      if (habit.days[today] == 2) {
+        // Si se marcó como completado, actualizar racha
+        await _notificationManager.updateStreak();
+      }
     } catch (e) {
       print('Error al actualizar hábito: $e');
       throw Exception('No se pudo actualizar el hábito: $e');
@@ -225,6 +260,11 @@ Future<List<Habit>> getHabitsFuture() async {
       
       // Actualizar en Firestore
       await _habitsCollection.doc(habitId).update({'days': updatedDays});
+      
+      // Si se marca como completado, actualizar racha
+      if (status == 2) {
+        await _notificationManager.updateStreak();
+      }
     } catch (e) {
       print('Error al actualizar estado del hábito: $e');
       throw Exception('No se pudo actualizar el estado del hábito: $e');
@@ -255,6 +295,18 @@ Future<List<Habit>> getHabitsFuture() async {
 
     for (final hobby in hobbies) {
       await hobbiesRef.doc(hobby.id).set(hobby.toMap());
+      
+      // Programar notificaciones para hobbies si tienen fechas programadas
+      if (hobby.registeredTimes.isNotEmpty) {
+        for (final timeEntry in hobby.registeredTimes) {
+          if (timeEntry is Map && timeEntry.containsKey('date')) {
+            final date = DateTime.parse(timeEntry['date']);
+            if (date.isAfter(DateTime.now())) {
+              await _notificationManager.scheduleHobbyNotification(hobby, date);
+            }
+          }
+        }
+      }
     }
   }
 
@@ -269,6 +321,18 @@ Future<List<Habit>> getHabitsFuture() async {
         .doc(hobby.id);
 
     await docRef.set(hobby.toMap());
+    
+    // Programar notificaciones para este hobby si tiene fechas programadas
+    if (hobby.registeredTimes.isNotEmpty) {
+      for (final timeEntry in hobby.registeredTimes) {
+        if (timeEntry is Map && timeEntry.containsKey('date')) {
+          final date = DateTime.parse(timeEntry['date']);
+          if (date.isAfter(DateTime.now())) {
+            await _notificationManager.scheduleHobbyNotification(hobby, date);
+          }
+        }
+      }
+    }
   }
 
   // MÉTODO PARA OBTENER LOS HOBBIES DEL USUARIO DESDE FIREBASE
@@ -293,6 +357,9 @@ Future<List<Habit>> getHabitsFuture() async {
         .doc(hobbyId);
 
     await docRef.delete();
+    
+    // Cancelar notificaciones para este hobby
+    await _notificationManager.cancelAllNotifications();
   }
 }
 

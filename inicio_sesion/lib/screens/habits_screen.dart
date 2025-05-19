@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../models/habit.dart';
 import '../services/local_storage_service.dart';
 import '../services/firebase_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../screens/habit_form_screen.dart';
-import 'dart:math' as math;
 
 class HabitsScreen extends StatefulWidget {
   const HabitsScreen({super.key});
