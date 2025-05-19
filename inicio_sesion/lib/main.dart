@@ -6,10 +6,13 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
 import 'services/simple_notification_service.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
+
 
 void main() async {
   // Aseguramos que Flutter esté inicializado
   WidgetsFlutterBinding.ensureInitialized();
+  tz.initializeTimeZones();
   
   // Configuramos la aplicación para que solo se pueda usar en modo vertical
   await SystemChrome.setPreferredOrientations([
