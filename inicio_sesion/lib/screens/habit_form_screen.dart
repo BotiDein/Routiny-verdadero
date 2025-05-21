@@ -747,6 +747,18 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
                           );
                           return;
                         }
+                        // Validar tiempo objetivo si el tipo es "time"
+                        if (_selectedType == 'time' && _isGoalEnabled) {
+                          final timeParts = _formattedTime.split(':').map(int.parse).toList();
+                          final totalSeconds = timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2];
+
+                          if (totalSeconds < 1) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Por favor selecciona un tiempo objetivo mayor a 00:00:00')),
+                            );
+                            return;
+                          }
+                        }
                         
                         // Preparar valores según el tipo
                         dynamic goalValue;
