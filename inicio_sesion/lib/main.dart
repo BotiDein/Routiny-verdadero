@@ -12,7 +12,6 @@ import 'package:timezone/data/latest_all.dart' as tz;
 void main() async {
   // Aseguramos que Flutter esté inicializado
   WidgetsFlutterBinding.ensureInitialized();
-  
   // Inicializamos timezone para notificaciones programadas
   tz.initializeTimeZones();
   

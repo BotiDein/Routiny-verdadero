@@ -250,6 +250,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     }
   }
 
+  // Modificar el método _saveTask para manejar mejor los errores y mostrar feedback al usuario
   Future<void> _saveTask() async {
     if (_titleController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -299,11 +300,26 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
 
       if (mounted) {
         Navigator.pop(context, true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.isEditing ? 'Tarea actualizada' : 'Tarea creada'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+      print('Error al guardar tarea: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('La tarea se guardó localmente. Se sincronizará cuando haya conexión.'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        // Cerrar la pantalla de todas formas, ya que la tarea se guardó localmente
+        Navigator.pop(context, true);
+      }
     } finally {
       if (mounted) {
         setState(() {

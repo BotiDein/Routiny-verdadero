@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/task.dart';
 import '../services/firebase_service.dart';
 import 'task_form_screen.dart';
+import '../services/local_storage_service.dart';
 
 class AgendaScreen extends StatefulWidget {
   const AgendaScreen({super.key});
@@ -27,28 +28,89 @@ class _AgendaScreenState extends State<AgendaScreen> {
     _loadTasks();
   }
 
+  // Modificar el método _loadTasks para manejar mejor los errores
   Future<void> _loadTasks() async {
     setState(() {
       _isLoading = true;
     });
 
-    // Escuchar cambios en las tareas
-    _firebaseService.getTasks().listen((tasks) {
+    try {
+      // Escuchar cambios en las tareas
+      _firebaseService.getTasks().listen((tasks) {
+        if (mounted) {
+          setState(() {
+            // Agrupar tareas por fecha
+            _tasksByDate = {};
+            for (var task in tasks) {
+              final dateKey = DateFormat('yyyy-MM-dd').format(task.date);
+              if (!_tasksByDate.containsKey(dateKey)) {
+                _tasksByDate[dateKey] = [];
+              }
+              _tasksByDate[dateKey]!.add(task);
+            }
+            _isLoading = false;
+          });
+        }
+      }, onError: (error) async {
+        print('Error al cargar tareas: $error');
+        // En caso de error, intentar cargar desde almacenamiento local
+        try {
+          final localStorageService = LocalStorageService();
+          final tasks = await localStorageService.getTasks();
+          
+          if (mounted) {
+            setState(() {
+              // Agrupar tareas por fecha
+              _tasksByDate = {};
+              for (var task in tasks) {
+                final dateKey = DateFormat('yyyy-MM-dd').format(task.date);
+                if (!_tasksByDate.containsKey(dateKey)) {
+                  _tasksByDate[dateKey] = [];
+                }
+                _tasksByDate[dateKey]!.add(task);
+              }
+              _isLoading = false;
+            });
+            
+            // Mostrar mensaje al usuario
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Mostrando tareas guardadas localmente. Algunas funciones pueden estar limitadas sin conexión.'),
+                duration: Duration(seconds: 5),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+            
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error al cargar tareas: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      });
+    } catch (e) {
+      print('Error general al cargar tareas: $e');
       if (mounted) {
         setState(() {
-          // Agrupar tareas por fecha
-          _tasksByDate = {};
-          for (var task in tasks) {
-            final dateKey = DateFormat('yyyy-MM-dd').format(task.date);
-            if (!_tasksByDate.containsKey(dateKey)) {
-              _tasksByDate[dateKey] = [];
-            }
-            _tasksByDate[dateKey]!.add(task);
-          }
           _isLoading = false;
         });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al cargar tareas: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
-    });
+    }
   }
 
   void _navigateToTaskForm({Task? task}) async {

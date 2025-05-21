@@ -377,6 +377,8 @@ class NotificationService {
           iOS: iOSDetails,
         );
 
+
+
         final List<String> motivationalMessages = [
           '¡No pierdas tu racha de $currentStreak días!',
           '¡Mantén el ritmo! Llevas $currentStreak días consecutivos',
@@ -407,6 +409,8 @@ class NotificationService {
       print('Error al programar recordatorio de racha: $e');
     }
   }
+  
+
   
   // Actualizar la racha cuando se completa una actividad
   Future<void> updateStreak() async {
@@ -462,26 +466,33 @@ class NotificationService {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
-  // Cancelar notificación específica
+  // Cancelar una notificación por ID
   Future<void> cancelNotification(int id) async {
     try {
-      if (!_isInitialized) {
-        await init();
-      }
-      
       await flutterLocalNotificationsPlugin.cancel(id);
+      print('Notificación cancelada: ID $id');
     } catch (e) {
       print('Error al cancelar notificación: $e');
     }
   }
 
-  // Cancelar todas las notificaciones
+  // Obtener la racha actual desde SharedPreferences
+  Future<int> getCurrentStreak() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(currentStreakKey) ?? 0;
+  }
+
+  // Limpiar todas las notificaciones programadas
   Future<void> cancelAllNotifications() async {
     try {
-      if (!_isInitialized) {
-        await init();
-      }
-      
+      await flutterLocalNotificationsPlugin.cancelAll();
+      print('Todas las notificaciones fueron canceladas');
+    } catch (e) {
+      print('Error al cancelar todas las notificaciones: $e');
+    }
+  }
+}
+
       await flutterLocalNotificationsPlugin.cancelAll();
     } catch (e) {
       print('Error al cancelar todas las notificaciones: $e');
