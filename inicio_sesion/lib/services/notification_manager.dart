@@ -331,14 +331,14 @@ class NotificationManager {
     }
   }
   
-    // Cancelar todas las notificaciones
+  // Cancelar todas las notificaciones
   Future<void> cancelAllNotifications() async {
     try {
       if (!_isInitialized) {
         await initialize();
       }
+      
       await _notificationService.cancelAllNotifications();
-      print('Todas las notificaciones han sido canceladas.');
     } catch (e) {
       print('Error al cancelar todas las notificaciones: $e');
     }
