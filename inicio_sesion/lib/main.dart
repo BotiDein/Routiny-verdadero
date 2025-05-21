@@ -7,11 +7,16 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
 import 'services/notification_manager.dart';
+import 'services/notification_service.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
+
+//GlobalKey para navegación
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   // Aseguramos que Flutter esté inicializado
   WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService().init();
   // Inicializamos timezone para notificaciones programadas
   tz.initializeTimeZones();
   
@@ -63,6 +68,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'Routiny',
       theme: ThemeData(

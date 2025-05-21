@@ -7,6 +7,10 @@ import '../models/task.dart';
 import '../models/hobby.dart';
 import 'dart:math';
 import 'dart:io' show Platform;
+import 'package:inicio_sesion/main.dart';
+
+const String taskChannelId = 'task_channel';
+const String habitChannelId = 'habit_channel';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -42,8 +46,9 @@ class NotificationService {
     if (_isInitialized) {
       print('NotificationService ya está inicializado');
       return;
+      
     }
-    
+
     try {
       // Inicializar timezone
       tz_init.initializeTimeZones();
@@ -68,7 +73,17 @@ class NotificationService {
         android: initializationSettingsAndroid,
         iOS: initializationSettingsIOS,
       );
-
+    await flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) async {
+        if (response.payload != null) {
+          navigatorKey.currentState?.pushNamed(
+            '/notification-details',
+            arguments: response.payload,
+          );
+        }
+      },
+    );
       // Inicializar plugin
       await flutterLocalNotificationsPlugin.initialize(
         initializationSettings,
@@ -77,6 +92,16 @@ class NotificationService {
           print('Notificación seleccionada: ${response.payload}');
         },
       );
+
+      await flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        print('Notificación seleccionada: ${response.payload}');
+        },
+      );
+
+    // Crear los canales de notificación
+    await _createNotificationChannels();
       
       // Marcar como inicializado
       _isInitialized = true;
@@ -84,6 +109,29 @@ class NotificationService {
       print('Inicialización de notificaciones completada');
     } catch (e) {
       print('Error al inicializar el servicio de notificaciones: $e');
+    }
+  }
+
+  Future<void> _createNotificationChannels() async {
+    const List<AndroidNotificationChannel> channels = [
+      AndroidNotificationChannel(
+        taskChannelId,
+        'Recordatorios de tareas',
+        importance: Importance.high,
+      ),
+      AndroidNotificationChannel(
+        habitChannelId,
+        'Recordatorios de hábitos',
+        importance: Importance.high,
+      ),
+      // Puedes agregar más canales si los necesitas
+    ];
+
+    final androidPlugin = flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+
+    for (final channel in channels) {
+      await androidPlugin?.createNotificationChannel(channel);
     }
   }
 

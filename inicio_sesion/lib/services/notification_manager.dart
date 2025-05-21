@@ -12,6 +12,7 @@ class NotificationManager {
   
   final NotificationService _notificationService = NotificationService();
   
+  
   // Clave para almacenar preferencias de notificaciones
   static const String notificationsEnabledKey = 'notifications_enabled';
   static const String taskNotificationsKey = 'task_notifications_enabled';
@@ -28,7 +29,7 @@ class NotificationManager {
       print('NotificationManager ya está inicializado');
       return;
     }
-    
+
     try {
       // Inicializar el servicio de notificaciones
       await _notificationService.init();
