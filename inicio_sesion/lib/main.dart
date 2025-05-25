@@ -7,25 +7,25 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
 import 'services/notification_manager.dart';
+import 'services/notification_service.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 
+//GlobalKey para navegación
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
-  // Aseguramos que Flutter esté inicializado
   WidgetsFlutterBinding.ensureInitialized();
-  // Inicializamos timezone para notificaciones programadas
-  tz.initializeTimeZones();
   
-  // Configuramos la aplicación para que solo se pueda usar en modo vertical
+  // Configuración inicial
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
   
-  // Inicializamos los datos de localización para español
   await initializeDateFormatting('es_ES', null);
   
+  // Inicializar Firebase
   try {
-    // Inicializamos Firebase
     await Firebase.initializeApp(
       options: kIsWeb
           ? const FirebaseOptions(
@@ -41,17 +41,29 @@ void main() async {
     print('Firebase inicializado correctamente');
   } catch (e) {
     print('Error al inicializar Firebase: $e');
-    // Continuar de todos modos, ya que la app puede funcionar sin Firebase
   }
   
-  // Inicializar el gestor de notificaciones avanzado
+  // Inicializar timezone para notificaciones
+  tz.initializeTimeZones();
+  
+  // Inicializar notificaciones
+  final notificationService = NotificationService();
+  await notificationService.init();
+  
+  // Escuchar notificaciones en primer plano
+  notificationService.notificationStreamController.stream.listen((response) {
+    print('Notificación recibida: ${response.payload}');
+    // Aquí puedes manejar la notificación cuando la app está en primer plano
+    // Por ejemplo, mostrar un diálogo o navegar a una pantalla específica
+  });
+  
+  // Inicializar el gestor de notificaciones
   try {
     final notificationManager = NotificationManager();
     await notificationManager.initialize();
     print('Sistema de notificaciones inicializado correctamente');
   } catch (e) {
     print('Error al inicializar el sistema de notificaciones: $e');
-    // Continuar de todos modos, ya que la app puede funcionar sin notificaciones
   }
   
   runApp(const MyApp());
@@ -63,6 +75,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'Routiny',
       theme: ThemeData(

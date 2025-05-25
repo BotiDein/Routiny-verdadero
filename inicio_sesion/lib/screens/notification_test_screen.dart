@@ -165,7 +165,7 @@ class _NotificationTestScreenState extends State<NotificationTestScreen> {
     });
     
     try {
-      await _notificationManager.scheduleHabitReminders();
+      //await _notificationManager.scheduleHabitReminders();
       
       setState(() {
         _statusMessage = 'Recordatorios de hábitos programados para las 8:00 AM y 6:00 PM.';

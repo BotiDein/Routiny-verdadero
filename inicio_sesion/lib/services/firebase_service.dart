@@ -5,6 +5,7 @@ import '../models/habit.dart';
 import '../models/hobby.dart';
 import 'notification_manager.dart';
 
+
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -207,7 +208,7 @@ Future<List<Habit>> getHabitsFuture() async {
       await _habitsCollection.doc(habit.id).set(habit.toMap());
       
       // Programar notificaciones de hábitos si es necesario
-      await _notificationManager.scheduleHabitReminders();
+      //await _notificationManager.scheduleHabitReminders();
     } catch (e) {
       print('Error al añadir hábito: $e');
       throw Exception('No se pudo añadir el hábito: $e');
