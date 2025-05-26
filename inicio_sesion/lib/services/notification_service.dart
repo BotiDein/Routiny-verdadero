@@ -25,6 +25,7 @@ class NotificationService {
   static const String habitChannelId = 'habit_channel';
   static const String streakChannelId = 'streak_channel';
   static const String hobbyChannelId = 'hobby_channel';
+  static const String testChannelId = 'test_channel';
   
   // IDs para notificaciones
   static const int morningHabitsId = 1001;
@@ -40,30 +41,27 @@ class NotificationService {
   static const String lastCompletionDateKey = 'last_completion_date';
   
   bool _isInitialized = false;
+  
+  // Getter público para verificar inicialización
+  bool get isInitialized => _isInitialized;
 
   Future<void> init() async {
     if (_isInitialized) return;
     
     try {
+      // Inicializar timezone
       tz_init.initializeTimeZones();
       
+      // Configuración para Android - CRÍTICO: especificar icono explícitamente
       const AndroidInitializationSettings initializationSettingsAndroid =
           AndroidInitializationSettings('@mipmap/ic_launcher');
       
-      final DarwinInitializationSettings initializationSettingsIOS =
+      // Configuración para iOS
+      const DarwinInitializationSettings initializationSettingsIOS =
           DarwinInitializationSettings(
         requestSoundPermission: true,
         requestBadgePermission: true,
         requestAlertPermission: true,
-        onDidReceiveLocalNotification: (int id, String? title, String? body, String? payload) async {
-          notificationStreamController.add(
-            NotificationResponse(
-              notificationResponseType: NotificationResponseType.selectedNotification,
-              id: id,
-              payload: payload,
-            )
-          );
-        },
       );
 
       final InitializationSettings initializationSettings = InitializationSettings(
@@ -71,81 +69,128 @@ class NotificationService {
         iOS: initializationSettingsIOS,
       );
 
-      await flutterLocalNotificationsPlugin.initialize(
+      // Inicializar el plugin
+      final bool? initialized = await flutterLocalNotificationsPlugin.initialize(
         initializationSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) {
+          print('Notification received: ${response.payload}');
           notificationStreamController.add(response);
         },
         onDidReceiveBackgroundNotificationResponse: (NotificationResponse response) {
+          print('Background notification received: ${response.payload}');
           notificationStreamController.add(response);
         },
       );
       
+      if (initialized != true) {
+        throw Exception('Failed to initialize notifications');
+      }
+      
       await _setupNotificationChannels();
       _isInitialized = true;
+      print('NotificationService initialized successfully');
     } catch (e) {
       print('Error initializing NotificationService: $e');
+      throw Exception('Failed to initialize NotificationService: $e');
     }
   }
 
   Future<void> _setupNotificationChannels() async {
     if (Platform.isAndroid) {
-      const AndroidNotificationChannel taskChannel = AndroidNotificationChannel(
-        taskChannelId,
-        'Recordatorios de tareas',
-        importance: Importance.high,
-        description: 'Notificaciones para recordar tareas pendientes',
-        playSound: true,
-      );
+      final androidPlugin = flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      
+      if (androidPlugin != null) {
+        // Canal para tareas
+        await androidPlugin.createNotificationChannel(
+          const AndroidNotificationChannel(
+            taskChannelId,
+            'Recordatorios de tareas',
+            importance: Importance.high,
+            description: 'Notificaciones para recordar tareas pendientes',
+            playSound: true,
+            enableVibration: true,
+          ),
+        );
 
-      const AndroidNotificationChannel habitChannel = AndroidNotificationChannel(
-        habitChannelId,
-        'Recordatorios de hábitos',
-        importance: Importance.high,
-        description: 'Notificaciones diarias para recordar hábitos',
-        playSound: true,
-      );
+        // Canal para hábitos
+        await androidPlugin.createNotificationChannel(
+          const AndroidNotificationChannel(
+            habitChannelId,
+            'Recordatorios de hábitos',
+            importance: Importance.high,
+            description: 'Notificaciones diarias para recordar hábitos',
+            playSound: true,
+            enableVibration: true,
+          ),
+        );
 
-      const AndroidNotificationChannel streakChannel = AndroidNotificationChannel(
-        streakChannelId,
-        'Recordatorios de racha',
-        importance: Importance.high,
-        description: 'Notificaciones para mantener tu racha',
-        playSound: true,
-      );
+        // Canal para rachas
+        await androidPlugin.createNotificationChannel(
+          const AndroidNotificationChannel(
+            streakChannelId,
+            'Recordatorios de racha',
+            importance: Importance.high,
+            description: 'Notificaciones para mantener tu racha',
+            playSound: true,
+            enableVibration: true,
+          ),
+        );
 
-      const AndroidNotificationChannel hobbyChannel = AndroidNotificationChannel(
-        hobbyChannelId,
-        'Recordatorios de hobbies',
-        importance: Importance.high,
-        description: 'Notificaciones para recordar hobbies programados',
-        playSound: true,
-      );
+        // Canal para hobbies
+        await androidPlugin.createNotificationChannel(
+          const AndroidNotificationChannel(
+            hobbyChannelId,
+            'Recordatorios de hobbies',
+            importance: Importance.high,
+            description: 'Notificaciones para recordar hobbies programados',
+            playSound: true,
+            enableVibration: true,
+          ),
+        );
 
-      await flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(taskChannel);
-
-      await flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(habitChannel);
-
-      await flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(streakChannel);
-
-      await flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(hobbyChannel);
+        // Canal para pruebas
+        await androidPlugin.createNotificationChannel(
+          const AndroidNotificationChannel(
+            testChannelId,
+            'Notificaciones de prueba',
+            importance: Importance.max,
+            description: 'Canal para probar notificaciones',
+            playSound: true,
+            enableVibration: true,
+          ),
+        );
+      }
     }
   }
 
   Future<bool> requestPermissions() async {
     try {
       if (Platform.isAndroid) {
-        return true; // Android maneja los permisos automáticamente desde Android 13
+        final androidPlugin = flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+        
+        if (androidPlugin != null) {
+          // Solicitar permisos de notificación exacta (Android 12+)
+          final bool? exactAlarmPermission = await androidPlugin.requestExactAlarmsPermission();
+          print('Exact alarm permission: $exactAlarmPermission');
+          
+          // Verificar si las notificaciones están habilitadas
+          final bool? enabled = await androidPlugin.areNotificationsEnabled();
+          print('Notifications enabled: $enabled');
+          
+          return enabled ?? false;
+        }
+        return true;
       } else if (Platform.isIOS) {
-        return true; // iOS maneja los permisos durante la inicialización
+        final bool? result = await flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+            ?.requestPermissions(
+              alert: true,
+              badge: true,
+              sound: true,
+            );
+        return result ?? false;
       }
       return false;
     } catch (e) {
@@ -162,12 +207,7 @@ class NotificationService {
                 AndroidFlutterLocalNotificationsPlugin>();
                 
         if (androidPlugin != null) {
-          try {
-            return await androidPlugin.areNotificationsEnabled() ?? false;
-          } catch (e) {
-            print('Error checking notification permissions: $e');
-            return true;
-          }
+          return await androidPlugin.areNotificationsEnabled() ?? false;
         }
       }
       return true;
@@ -177,20 +217,30 @@ class NotificationService {
     }
   }
 
-  Future<void> cancelNotification(int id) async {
-    try {
-      await flutterLocalNotificationsPlugin.cancel(id);
-    } catch (e) {
-      print('Error canceling notification: $e');
-    }
-  }
-
-  Future<void> cancelAllNotifications() async {
-    try {
-      await flutterLocalNotificationsPlugin.cancelAll();
-    } catch (e) {
-      print('Error canceling all notifications: $e');
-    }
+  // Método ROBUSTO para crear detalles de notificación Android
+  AndroidNotificationDetails _createRobustAndroidDetails(
+    String channelId,
+    String channelName,
+    String description,
+  ) {
+    return AndroidNotificationDetails(
+      channelId,
+      channelName,
+      channelDescription: description,
+      importance: Importance.high,
+      priority: Priority.high,
+      // CRÍTICO: Especificar explícitamente el icono
+      icon: '@mipmap/ic_launcher',
+      // CRÍTICO: No usar propiedades que puedan ser nulas
+      largeIcon: null,
+      styleInformation: null,
+      // Configuración básica y segura
+      autoCancel: true,
+      ongoing: false,
+      silent: false,
+      enableVibration: true,
+      playSound: true,
+    );
   }
 
   Future<void> scheduleTaskNotification(Task task) async {
@@ -199,22 +249,25 @@ class NotificationService {
       
       await cancelNotification(task.id.hashCode);
       
-      if (task.isCompleted) return;
+      if (task.isCompleted) {
+        print('Task is completed, not scheduling notification');
+        return;
+      }
 
       final notificationTime = task.date.subtract(const Duration(minutes: 5));
-      final tz.TZDateTime scheduledDate = tz.TZDateTime.from(notificationTime, tz.local);
+      final now = DateTime.now();
       
-      if (scheduledDate.isBefore(tz.TZDateTime.now(tz.local))) {
+      if (notificationTime.isBefore(now)) {
+        print('Notification time is in the past, not scheduling');
         return;
       }
       
-      const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      final tz.TZDateTime scheduledDate = tz.TZDateTime.from(notificationTime, tz.local);
+      
+      final AndroidNotificationDetails androidDetails = _createRobustAndroidDetails(
         taskChannelId,
         'Recordatorios de tareas',
-        channelDescription: 'Notificaciones para recordar tareas pendientes',
-        importance: Importance.high,
-        priority: Priority.high,
-        color: Colors.blue,
+        'Notificaciones para recordar tareas pendientes',
       );
       
       const DarwinNotificationDetails iOSDetails = DarwinNotificationDetails(
@@ -223,19 +276,116 @@ class NotificationService {
         presentSound: true,
       );
 
+      final NotificationDetails notificationDetails = NotificationDetails(
+        android: androidDetails, 
+        iOS: iOSDetails
+      );
+
       await flutterLocalNotificationsPlugin.zonedSchedule(
         task.id.hashCode,
         'Tarea en 5 minutos',
         'Recuerda: ${task.title}',
         scheduledDate,
-        const NotificationDetails(android: androidDetails, iOS: iOSDetails),
-        androidAllowWhileIdle: true,
+        notificationDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
         payload: 'task_${task.id}',
       );
+      
+      print('Task notification scheduled for: $scheduledDate');
     } catch (e) {
       print('Error scheduling task notification: $e');
+      throw Exception('Failed to schedule task notification: $e');
+    }
+  }
+
+  Future<void> scheduleHobbyNotification(Hobby hobby, DateTime scheduledDate) async {
+    try {
+      if (!_isInitialized) await init();
+      
+      await cancelNotification(hobby.id.hashCode);
+      
+      final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
+      final tz.TZDateTime notificationTime = tz.TZDateTime.from(
+        scheduledDate.subtract(const Duration(minutes: 5)),
+        tz.local,
+      );
+      
+      if (notificationTime.isBefore(now)) {
+        print('Hobby notification time is in the past, not scheduling');
+        return;
+      }
+      
+      final AndroidNotificationDetails androidDetails = _createRobustAndroidDetails(
+        hobbyChannelId,
+        'Recordatorios de hobbies',
+        'Notificaciones para recordar hobbies programados',
+      );
+      
+      const DarwinNotificationDetails iOSDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      final NotificationDetails notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: iOSDetails,
+      );
+
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        hobby.id.hashCode,
+        'Hobby programado',
+        'En 5 minutos: ${hobby.name}',
+        notificationTime,
+        notificationDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: 'hobby_${hobby.id}',
+      );
+      
+      print('Hobby notification scheduled for: $notificationTime');
+    } catch (e) {
+      print('Error scheduling hobby notification: $e');
+      throw Exception('Failed to schedule hobby notification: $e');
+    }
+  }
+
+  Future<void> showTestNotification() async {
+    try {
+      if (!_isInitialized) await init();
+      
+      final AndroidNotificationDetails androidDetails = _createRobustAndroidDetails(
+        testChannelId,
+        'Notificaciones de prueba',
+        'Canal para probar notificaciones',
+      );
+      
+      const DarwinNotificationDetails iOSDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+      
+      final NotificationDetails notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: iOSDetails,
+      );
+      
+      await flutterLocalNotificationsPlugin.show(
+        0,
+        'Prueba de notificación',
+        'Esta es una notificación de prueba - ${DateTime.now().toString()}',
+        notificationDetails,
+        payload: 'test_notification',
+      );
+      
+      print('Test notification shown');
+    } catch (e) {
+      print('Error showing test notification: $e');
+      throw Exception('Failed to show test notification: $e');
     }
   }
 
@@ -261,8 +411,11 @@ class NotificationService {
         eveningHour,
         0,
       );
+      
+      print('Habit reminders scheduled');
     } catch (e) {
       print('Error scheduling habit reminders: $e');
+      throw Exception('Failed to schedule habit reminders: $e');
     }
   }
 
@@ -288,13 +441,10 @@ class NotificationService {
         scheduledDate = scheduledDate.add(const Duration(days: 1));
       }
       
-      const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      final AndroidNotificationDetails androidDetails = _createRobustAndroidDetails(
         habitChannelId,
         'Recordatorios de hábitos',
-        channelDescription: 'Notificaciones diarias para recordar hábitos',
-        importance: Importance.high,
-        priority: Priority.high,
-        color: Colors.green,
+        'Notificaciones diarias para recordar hábitos',
       );
       
       const DarwinNotificationDetails iOSDetails = DarwinNotificationDetails(
@@ -303,7 +453,7 @@ class NotificationService {
         presentSound: true,
       );
 
-      const NotificationDetails notificationDetails = NotificationDetails(
+      final NotificationDetails notificationDetails = NotificationDetails(
         android: androidDetails,
         iOS: iOSDetails,
       );
@@ -314,7 +464,7 @@ class NotificationService {
         body,
         scheduledDate,
         notificationDetails,
-        androidAllowWhileIdle: true,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.time,
@@ -322,128 +472,24 @@ class NotificationService {
       );
     } catch (e) {
       print('Error scheduling habit reminder: $e');
+      throw Exception('Failed to schedule habit reminder: $e');
     }
   }
 
-  Future<void> scheduleStreakReminder() async {
+  Future<void> cancelNotification(int id) async {
     try {
-      if (!_isInitialized) await init();
-      
-      final currentStreak = await getCurrentStreak();
-      if (currentStreak > 0) {
-        await cancelNotification(streakReminderId);
-        
-        final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
-        tz.TZDateTime scheduledDate = tz.TZDateTime(
-          tz.local,
-          now.year,
-          now.month,
-          now.day,
-          20, // 8 PM
-          0,
-        );
-        
-        if (scheduledDate.isBefore(now)) {
-          scheduledDate = scheduledDate.add(const Duration(days: 1));
-        }
-        
-        const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-          streakChannelId,
-          'Recordatorios de racha',
-          channelDescription: 'Notificaciones para mantener tu racha',
-          importance: Importance.high,
-          priority: Priority.high,
-          color: Colors.orange,
-        );
-        
-        const DarwinNotificationDetails iOSDetails = DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        );
-
-        const NotificationDetails notificationDetails = NotificationDetails(
-          android: androidDetails,
-          iOS: iOSDetails,
-        );
-
-        final List<String> motivationalMessages = [
-          '¡No pierdas tu racha de $currentStreak días!',
-          '¡Mantén el ritmo! Llevas $currentStreak días consecutivos',
-          '¡$currentStreak días de constancia! No te detengas ahora',
-          'Tu racha de $currentStreak días está en juego. ¡Completa tus actividades!',
-          '¡Sigue así! $currentStreak días de constancia y contando',
-        ];
-        
-        final random = Random();
-        final message = motivationalMessages[random.nextInt(motivationalMessages.length)];
-
-        await flutterLocalNotificationsPlugin.zonedSchedule(
-          streakReminderId,
-          '¡Mantén tu racha!',
-          message,
-          scheduledDate,
-          notificationDetails,
-          androidAllowWhileIdle: true,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-          payload: 'streak_reminder',
-        );
-      }
+      await flutterLocalNotificationsPlugin.cancel(id);
     } catch (e) {
-      print('Error scheduling streak reminder: $e');
+      print('Error canceling notification: $e');
     }
   }
 
-  Future<void> scheduleHobbyNotification(Hobby hobby, DateTime scheduledDate) async {
+  Future<void> cancelAllNotifications() async {
     try {
-      if (!_isInitialized) await init();
-      
-      await cancelNotification(hobby.id.hashCode);
-      
-      final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
-      final tz.TZDateTime notificationTime = tz.TZDateTime.from(
-        scheduledDate.subtract(const Duration(minutes: 5)),
-        tz.local,
-      );
-      
-      if (notificationTime.isBefore(now)) {
-        return;
-      }
-      
-      const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-        hobbyChannelId,
-        'Recordatorios de hobbies',
-        channelDescription: 'Notificaciones para recordar hobbies programados',
-        importance: Importance.high,
-        priority: Priority.high,
-        color: Colors.purple,
-      );
-      
-      const DarwinNotificationDetails iOSDetails = DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-      );
-
-      const NotificationDetails notificationDetails = NotificationDetails(
-        android: androidDetails,
-        iOS: iOSDetails,
-      );
-
-      await flutterLocalNotificationsPlugin.zonedSchedule(
-        hobby.id.hashCode,
-        'Hobby programado',
-        'En 5 minutos: ${hobby.name}',
-        notificationTime,
-        notificationDetails,
-        androidAllowWhileIdle: true,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        payload: 'hobby_${hobby.id}',
-      );
+      await flutterLocalNotificationsPlugin.cancelAll();
+      print('All notifications cancelled');
     } catch (e) {
-      print('Error scheduling hobby notification: $e');
+      print('Error canceling all notifications: $e');
     }
   }
 
@@ -488,37 +534,70 @@ class NotificationService {
     }
   }
 
-  Future<void> showTestNotification() async {
+  Future<void> scheduleStreakReminder() async {
     try {
       if (!_isInitialized) await init();
       
-      const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-        'test_channel',
-        'Notificaciones de prueba',
-        channelDescription: 'Canal para probar notificaciones',
-        importance: Importance.max,
-        priority: Priority.high,
-      );
-      
-      const DarwinNotificationDetails iOSDetails = DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-      );
-      
-      const NotificationDetails notificationDetails = NotificationDetails(
-        android: androidDetails,
-        iOS: iOSDetails,
-      );
-      
-      await flutterLocalNotificationsPlugin.show(
-        0,
-        'Prueba de notificación',
-        'Esta es una notificación de prueba',
-        notificationDetails,
-      );
+      final currentStreak = await getCurrentStreak();
+      if (currentStreak > 0) {
+        await cancelNotification(streakReminderId);
+        
+        final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
+        tz.TZDateTime scheduledDate = tz.TZDateTime(
+          tz.local,
+          now.year,
+          now.month,
+          now.day,
+          20, // 8 PM
+          0,
+        );
+        
+        if (scheduledDate.isBefore(now)) {
+          scheduledDate = scheduledDate.add(const Duration(days: 1));
+        }
+        
+        final AndroidNotificationDetails androidDetails = _createRobustAndroidDetails(
+          streakChannelId,
+          'Recordatorios de racha',
+          'Notificaciones para mantener tu racha',
+        );
+        
+        const DarwinNotificationDetails iOSDetails = DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        );
+
+        final NotificationDetails notificationDetails = NotificationDetails(
+          android: androidDetails,
+          iOS: iOSDetails,
+        );
+
+        final List<String> motivationalMessages = [
+          '¡No pierdas tu racha de $currentStreak días!',
+          '¡Mantén el ritmo! Llevas $currentStreak días consecutivos',
+          '¡$currentStreak días de constancia! No te detengas ahora',
+          'Tu racha de $currentStreak días está en juego. ¡Completa tus actividades!',
+          '¡Sigue así! $currentStreak días de constancia y contando',
+        ];
+        
+        final random = Random();
+        final message = motivationalMessages[random.nextInt(motivationalMessages.length)];
+
+        await flutterLocalNotificationsPlugin.zonedSchedule(
+          streakReminderId,
+          '¡Mantén tu racha!',
+          message,
+          scheduledDate,
+          notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          payload: 'streak_reminder',
+        );
+      }
     } catch (e) {
-      print('Error showing test notification: $e');
+      print('Error scheduling streak reminder: $e');
     }
   }
 

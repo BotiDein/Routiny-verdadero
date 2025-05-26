@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Archivo: android/app/src/main/res/values/colors.xml -->
+<resources>
+    <color name="notification_color">#4A90E2</color>
+    <color name="primary_color">#4A90E2</color>
+    <color name="accent_color">#0047AB</color>
+</resources>
