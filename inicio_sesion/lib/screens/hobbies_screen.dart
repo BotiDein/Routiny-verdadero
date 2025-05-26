@@ -169,30 +169,22 @@ class _HobbiesScreenState extends State<HobbiesScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: const Color(0xFF0D47A1),
-        onPressed: () {
-          // Navegar a la pantalla para agregar un nuevo hobby
-          Navigator.push(
+        onPressed: () async {
+          // Esperar el resultado del formulario
+          final result = await Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const HobbyFormScreen()),
-          ).then((result) {
-            if (result != null && result is Map<String, dynamic>) {
-              // Convertir el mapa a un objeto Hobby
-              final newHobby = Hobby(
-                id: DateTime.now().millisecondsSinceEpoch.toString(),
-                name: result['name'] ?? '',
-                icon: result['icon'] ?? '😊',
-                time: result['time'] ?? '00:00:00',
-                weeklyGoal: result['weeklyGoal'] ?? '05:00:00',
-                registeredTimes: List<Map<String, dynamic>>.from(result['registeredTimes'] ?? []),
-                activeDays: List<int>.from(result['activeDays'] ?? []),
-              );
-              
-              setState(() {
-                _hobbies.add(newHobby);
-                _storageService.addHobby(newHobby);
-              });
-            }
-          });
+          );
+
+          // Verificar si se devolvió un Hobby válido
+          if (result != null && result is Hobby) {
+            setState(() {
+              _hobbies.add(result); // Agregar directamente el hobby recibido
+            });
+
+            // Guardar también localmente
+            await _storageService.addHobby(result);
+          }
         },
         child: const Icon(Icons.add, color: Colors.white),
       ),

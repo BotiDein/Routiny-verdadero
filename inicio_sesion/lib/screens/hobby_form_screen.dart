@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/firebase_service.dart';
 import '../services/local_storage_service.dart';
+import '../models/hobby.dart';
 
 
 class HobbyFormScreen extends StatefulWidget {
@@ -181,40 +182,47 @@ class _HobbyFormScreenState extends State<HobbyFormScreen> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () async {
-                    if (_nameController.text.isNotEmpty) {
-                      // Crear un nuevo hobby y volver a la pantalla anterior
-                      final hours = _weeklyGoalController.text.isNotEmpty 
-                          ? _weeklyGoalController.text.padLeft(2, '0')
-                          : '05';
-                      
-                      final Map<String, dynamic> hobbyData = {
-                        'id': widget.isEditing && widget.hobby != null && widget.hobby!.containsKey('id') 
-                            ? widget.hobby!['id'] 
-                            : DateTime.now().millisecondsSinceEpoch.toString(),
-                        'name': _nameController.text,
-                        'icon': _selectedEmoji,
-                        'time': '00:00:00',
-                        'weeklyGoal': '$hours:00:00',
-                        'registeredTimes': widget.isEditing && widget.hobby != null && widget.hobby!.containsKey('registeredTimes')
-                            ? widget.hobby!['registeredTimes']
-                            : [],
-                        'activeDays': widget.isEditing && widget.hobby != null && widget.hobby!.containsKey('activeDays')
-                            ? widget.hobby!['activeDays']
-                            : [],
-                      };
-                          
-                      Navigator.pop(context, hobbyData);
-                    } else {
+                    if (_nameController.text.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Por favor ingresa un nombre para el hobby'),
-                        ),
+                        const SnackBar(content: Text('Por favor ingresa un nombre para el hobby')),
                       );
+                      return;
                     }
-                  final firebaseService = FirebaseService();
-                  final localStorageService = LocalStorageService();
-                  final hobbies = await localStorageService.getHobbies();
-                  await firebaseService.saveUserHobbies(hobbies);
+
+                    // 2) Construye el objeto Hobby usando los valores del Map si editas
+                    final hoursText = _weeklyGoalController.text.isNotEmpty
+                      ? _weeklyGoalController.text.padLeft(2, '0')
+                      : '05';
+
+                    final hobby = Hobby(
+                      id: widget.isEditing && widget.hobby != null && widget.hobby!.containsKey('id')
+                          ? widget.hobby!['id'] as String              // <-- getter corregido
+                          : DateTime.now().millisecondsSinceEpoch.toString(),
+                      name: _nameController.text,
+                      icon: _selectedEmoji,
+                      time: '00:00:00',
+                      weeklyGoal: '$hoursText:00:00',
+                      registeredTimes: widget.isEditing
+                          && widget.hobby != null
+                          && widget.hobby!.containsKey('registeredTimes')
+                        ? List<Map<String, dynamic>>.from(widget.hobby!['registeredTimes'] as List)
+                        : <Map<String, dynamic>>[],                   // <-- getter corregido
+                      activeDays: widget.isEditing
+                          && widget.hobby != null
+                          && widget.hobby!.containsKey('activeDays')
+                        ? List<int>.from(widget.hobby!['activeDays'] as List)
+                        : <int>[],                                    // <-- getter corregido
+                    );
+
+                    // 3) Guarda primero localmente, luego en Firebase
+                    final localStorage = LocalStorageService();
+                    await localStorage.addHobby(hobby);
+
+                    final firebaseService = FirebaseService();
+                    await firebaseService.saveSingleUserHobby(hobby);
+
+                    // 4) Finalmente retorna el objeto Hobby a la pantalla anterior
+                    Navigator.pop(context, hobby);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF0D47A1),
