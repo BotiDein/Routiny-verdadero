@@ -39,32 +39,33 @@ void main() async {
               )
               : DefaultFirebaseOptions.currentPlatform,
     );
-    print('✅ Firebase inicializado correctamente');
+    print('Firebase inicializado correctamente');
   } catch (e) {
-    print('❌ Error al inicializar Firebase: $e');
+    print('Error al inicializar Firebase: $e');
   }
 
   // Inicializar timezone para notificaciones (solo en móvil)
   if (!kIsWeb) {
     try {
       tz.initializeTimeZones();
-      print('✅ Timezone inicializado correctamente');
+      print('Timezone inicializado correctamente');
     } catch (e) {
-      print('❌ Error al inicializar timezone: $e');
+      print('Error al inicializar timezone: $e');
     }
   }
 
-  // Inicializar sistema de notificaciones mejorado (solo en móvil)
+  // Inicializar notificaciones (solo en móvil)
   if (!kIsWeb) {
     try {
+      // Inicializar el gestor de notificaciones
       final notificationManager = NotificationManager();
       await notificationManager.initialize();
-      print('✅ Sistema de notificaciones inicializado correctamente');
+      print('Sistema de notificaciones inicializado correctamente');
 
       // Configurar el listener para notificaciones
       _setupNotificationListener(notificationManager);
     } catch (e) {
-      print('❌ Error al inicializar el sistema de notificaciones: $e');
+      print('Error al inicializar el sistema de notificaciones: $e');
       // No detener la app, solo registrar el error
     }
   }
@@ -74,18 +75,18 @@ void main() async {
 
 void _setupNotificationListener(NotificationManager notificationManager) {
   try {
-    // Escuchar notificaciones con el nuevo sistema
+    // Escuchar notificaciones
     notificationManager.notificationStream.listen(
       (response) {
-        print('📱 Notificación recibida: ${response.payload}');
+        print('Notificación recibida: ${response.payload}');
         _handleNotificationResponse(response);
       },
       onError: (error) {
-        print('❌ Error en el stream de notificaciones: $error');
+        print('Error en el stream de notificaciones: $error');
       },
     );
   } catch (e) {
-    print('❌ Error configurando listener de notificaciones: $e');
+    print('Error configurando listener de notificaciones: $e');
   }
 }
 
@@ -100,107 +101,56 @@ void _handleNotificationResponse(NotificationResponse response) {
       _handleTaskNotification(payload);
     } else if (payload.startsWith('hobby_')) {
       _handleHobbyNotification(payload);
-    } else if (payload == 'habit_morning' || payload == 'habit_evening') {
-      _handleHabitNotification(payload);
+    } else if (payload == 'habit_reminder') {
+      _handleHabitNotification();
     } else if (payload == 'streak_reminder') {
       _handleStreakNotification();
     } else if (payload == 'test_notification') {
       _handleTestNotification();
     }
   } catch (e) {
-    print('❌ Error manejando respuesta de notificación: $e');
+    print('Error manejando respuesta de notificación: $e');
   }
 }
 
 void _handleTaskNotification(String payload) {
-  final taskId = payload.replaceFirst('task_', '');
-  print('📋 Manejando notificación de tarea: $taskId');
-  _showNotificationSnackBar(
-    '📋 Tienes una tarea pendiente',
-    Colors.blue,
-    action: SnackBarAction(
-      label: 'VER',
-      textColor: Colors.white,
-      onPressed: () {
-        // TODO: Navegar a la tarea específica
-        print('Navegando a tarea: $taskId');
-      },
-    ),
-  );
+  print('Manejando notificación de tarea: $payload');
+  _showNotificationSnackBar('Tienes una tarea pendiente', Colors.blue);
 }
 
 void _handleHobbyNotification(String payload) {
-  final hobbyId = payload.replaceFirst('hobby_', '');
-  print('🎨 Manejando notificación de hobby: $hobbyId');
-  _showNotificationSnackBar(
-    '🎨 Es hora de tu hobby',
-    Colors.purple,
-    action: SnackBarAction(
-      label: 'IR',
-      textColor: Colors.white,
-      onPressed: () {
-        // TODO: Navegar al hobby específico
-        print('Navegando a hobby: $hobbyId');
-      },
-    ),
-  );
+  print('Manejando notificación de hobby: $payload');
+  _showNotificationSnackBar('Es hora de tu hobby', Colors.purple);
 }
 
-void _handleHabitNotification(String payload) {
-  final isEvening = payload == 'habit_evening';
-  print('🌱 Manejando notificación de hábitos: $payload');
-
-  final message =
-      isEvening
-          ? '🌙 Recuerda completar tus hábitos antes de dormir'
-          : '🌅 ¡Buenos días! Es hora de tus hábitos matutinos';
-
-  _showNotificationSnackBar(
-    message,
-    Colors.green,
-    action: SnackBarAction(
-      label: 'VER HÁBITOS',
-      textColor: Colors.white,
-      onPressed: () {
-        // TODO: Navegar a la pantalla de hábitos
-        print('Navegando a hábitos');
-      },
-    ),
-  );
+void _handleHabitNotification() {
+  print('Manejando notificación de hábitos');
+  _showNotificationSnackBar('Recuerda completar tus hábitos', Colors.green);
 }
 
 void _handleStreakNotification() {
-  print('🔥 Manejando notificación de racha');
+  print('Manejando notificación de racha');
   _showStreakDialog();
 }
 
 void _handleTestNotification() {
-  print('🧪 Notificación de prueba recibida correctamente');
-  _showNotificationSnackBar(
-    '🧪 ¡Notificación de prueba recibida!',
-    Colors.orange,
-  );
+  print('Notificación de prueba recibida correctamente');
+  _showNotificationSnackBar('¡Notificación de prueba recibida!', Colors.orange);
 }
 
-void _showNotificationSnackBar(
-  String message,
-  Color color, {
-  SnackBarAction? action,
-}) {
+void _showNotificationSnackBar(String message, Color color) {
   final context = navigatorKey.currentContext;
   if (context != null) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: color,
-        duration: const Duration(seconds: 4),
-        action:
-            action ??
-            SnackBarAction(
-              label: 'OK',
-              textColor: Colors.white,
-              onPressed: () {},
-            ),
+        duration: const Duration(seconds: 3),
+        action: SnackBarAction(
+          label: 'OK',
+          textColor: Colors.white,
+          onPressed: () {},
+        ),
       ),
     );
   }
@@ -215,29 +165,24 @@ void _showStreakDialog() {
         return AlertDialog(
           title: const Row(
             children: [
-              Icon(Icons.local_fire_department, color: Colors.orange, size: 28),
+              Icon(Icons.local_fire_department, color: Colors.orange),
               SizedBox(width: 8),
               Text('¡Mantén tu racha!'),
             ],
           ),
           content: const Text(
-            'No olvides completar tus actividades de hoy para mantener tu racha de constancia.',
+            'No olvides completar tus actividades de hoy para mantener tu racha.',
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Más tarde'),
+              child: const Text('Entendido'),
             ),
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                // TODO: Navegar a la pantalla principal
-                print('Navegando a actividades');
+                // Aquí podrías navegar a la pantalla principal
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-                foregroundColor: Colors.white,
-              ),
               child: const Text('Ver actividades'),
             ),
           ],
@@ -260,8 +205,10 @@ class MyApp extends StatelessWidget {
         primaryColor: const Color(0xFF4A90E2),
         scaffoldBackgroundColor: const Color(0xFFE0FFFF),
         useMaterial3: true,
+        // Configuración compatible para SnackBar
         snackBarTheme: const SnackBarThemeData(
           behavior: SnackBarBehavior.floating,
+          // Removido el parámetro 'margin' que causaba el error
         ),
       ),
       home: const SplashScreen(),

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../auth/landing_page.dart';
-import 'notification_settings_screen.dart';
 import '../services/notification_manager.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -33,13 +32,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _isLoadingStreak = true;
     });
-    
-    final streak = await _notificationManager.getCurrentStreak();
-    
-    setState(() {
-      _currentStreak = streak;
-      _isLoadingStreak = false;
-    });
+
+    try {
+      final streak = await _notificationManager.getCurrentStreak();
+
+      setState(() {
+        _currentStreak = streak;
+        _isLoadingStreak = false;
+      });
+    } catch (e) {
+      print('Error al cargar racha: $e');
+      setState(() {
+        _currentStreak = 0;
+        _isLoadingStreak = false;
+      });
+    }
   }
 
   @override
@@ -84,9 +91,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             // Sección de racha
             if (!_isLoadingStreak && _currentStreak > 0) _buildStreakSection(),
-            
-            if (!_isLoadingStreak && _currentStreak > 0) SizedBox(height: scaleHeight(20)),
-            
+
+            if (!_isLoadingStreak && _currentStreak > 0)
+              SizedBox(height: scaleHeight(20)),
+
+            // 🔧 CORREGIDO: Navegación a pantalla de notificaciones
             _buildConfigItem(
               Icons.notifications,
               'Notificaciones',
@@ -182,7 +191,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildConfigItem(IconData icon, String text, double fontSize, VoidCallback onTap) {
+  Widget _buildConfigItem(
+    IconData icon,
+    String text,
+    double fontSize,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       child: Row(
@@ -221,18 +235,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showMessageDialog(BuildContext context,
-      {required String title, required String message, required VoidCallback onConfirm}) {
+  void _showMessageDialog(
+    BuildContext context, {
+    required String title,
+    required String message,
+    required VoidCallback onConfirm,
+  }) {
     showDialog(
       context: context,
       barrierDismissible: true,
       builder: (context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text(title, style: const TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.bold)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Text(
+            title,
+            style: const TextStyle(
+              fontFamily: 'Roboto',
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           content: Text(message, style: const TextStyle(fontFamily: 'Roboto')),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('No')),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('No'),
+            ),
             ElevatedButton(onPressed: onConfirm, child: const Text('Sí')),
           ],
         );
@@ -246,7 +275,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       barrierDismissible: true,
       builder: (BuildContext context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           title: const Text(
             'Acerca de la app',
             style: TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.bold),
@@ -271,7 +302,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-
   void _showSuggestionDialog(BuildContext context) {
     final TextEditingController suggestionController = TextEditingController();
 
@@ -280,7 +310,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       barrierDismissible: true,
       builder: (BuildContext context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           title: const Text(
             'Sugerencias',
             style: TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.bold),
@@ -301,7 +333,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     hintText: 'Escribe tu opinión aquí...',
                     filled: true,
                     fillColor: Colors.grey[200],
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               ],
@@ -317,23 +351,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 final suggestion = suggestionController.text.trim();
                 if (suggestion.isNotEmpty) {
                   Navigator.of(context).pop();
-                  
+
                   final user = FirebaseAuth.instance.currentUser;
                   final uid = user?.uid ?? 'anónimo';
                   final email = user?.email ?? 'anónimo';
-                  
-                  // Guardar la sugerencia en Firestore
-                  await FirebaseFirestore.instance.collection('sugerencias').add({
-                    'texto': suggestion,
-                    'uid': uid,
-                    'email': email,
-                    'fecha': FieldValue.serverTimestamp(),
-                  });
 
-                  if (mounted) {
-                    _messenger.showSnackBar(
-                      const SnackBar(content: Text('¡Gracias por tu sugerencia!')),
-                    );
+                  try {
+                    await FirebaseFirestore.instance
+                        .collection('sugerencias')
+                        .add({
+                          'texto': suggestion,
+                          'uid': uid,
+                          'email': email,
+                          'fecha': FieldValue.serverTimestamp(),
+                        });
+
+                    if (mounted) {
+                      _messenger.showSnackBar(
+                        const SnackBar(
+                          content: Text('¡Gracias por tu sugerencia!'),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      _messenger.showSnackBar(
+                        SnackBar(
+                          content: Text('Error al enviar sugerencia: $e'),
+                        ),
+                      );
+                    }
                   }
                 }
               },
@@ -349,89 +396,403 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-    final userData = userDoc.data();
+    try {
+      final userDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
+      final userData = userDoc.data();
 
-    final name = userData?['name'] ?? 'Desconocido';
-    final email = user.email ?? 'Sin correo';
+      final name = userData?['name'] ?? 'Desconocido';
+      final email = user.email ?? 'Sin correo';
 
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          titlePadding: const EdgeInsets.all(0),
-          contentPadding: const EdgeInsets.all(24),
-          backgroundColor: const Color(0xFFE0FFFF),
-          title: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: Color(0xFF4A90E2),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
             ),
-            child: Row(
+            titlePadding: const EdgeInsets.all(0),
+            contentPadding: const EdgeInsets.all(24),
+            backgroundColor: const Color(0xFFE0FFFF),
+            title: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                color: Color(0xFF4A90E2),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.black),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Mi cuenta',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                      fontSize: 20,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.black),
-                  onPressed: () => Navigator.pop(context),
-                ),
-                const SizedBox(width: 8),
                 const Text(
-                  'Mi cuenta',
-                  style: TextStyle(
-                    fontFamily: 'Roboto',
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                    fontSize: 20,
+                  'Mi nombre',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(name),
+                const Divider(),
+                const SizedBox(height: 8),
+                const Text(
+                  'Mi correo electrónico',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(email),
+                const Divider(),
+                const SizedBox(height: 20),
+                Center(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF005BBB),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                    ),
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      try {
+                        await FirebaseAuth.instance.sendPasswordResetEmail(
+                          email: email,
+                        );
+                        if (mounted) {
+                          _messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Se ha enviado un correo para restablecer tu contraseña',
+                              ),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          _messenger.showSnackBar(
+                            SnackBar(
+                              content: Text('Error al enviar el correo: $e'),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    child: const Text('Cambiar contraseña'),
                   ),
                 ),
               ],
             ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Mi nombre', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text(name),
-              const Divider(),
-              const SizedBox(height: 8),
-              const Text('Mi correo electrónico', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text(email),
-              const Divider(),
-              const SizedBox(height: 20),
-              Center(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF005BBB),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          );
+        },
+      );
+    } catch (e) {
+      _messenger.showSnackBar(
+        SnackBar(content: Text('Error al cargar información de cuenta: $e')),
+      );
+    }
+  }
+}
+
+// 🆕 NUEVA: Pantalla de configuración de notificaciones
+class NotificationSettingsScreen extends StatefulWidget {
+  const NotificationSettingsScreen({super.key});
+
+  @override
+  State<NotificationSettingsScreen> createState() =>
+      _NotificationSettingsScreenState();
+}
+
+class _NotificationSettingsScreenState
+    extends State<NotificationSettingsScreen> {
+  final NotificationManager _notificationManager = NotificationManager();
+  bool _notificationsEnabled = false;
+  bool _isLoading = true;
+  List<dynamic> _pendingNotifications = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotificationSettings();
+  }
+
+  Future<void> _loadNotificationSettings() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final enabled = await _notificationManager.areNotificationsEnabled();
+      final pending = await _notificationManager.getPendingNotifications();
+
+      setState(() {
+        _notificationsEnabled = enabled;
+        _pendingNotifications = pending;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error al cargar configuración de notificaciones: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _showTestNotification() async {
+    try {
+      await _notificationManager.showTestNotification();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Notificación de prueba enviada')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al enviar notificación: $e')),
+      );
+    }
+  }
+
+  Future<void> _cancelAllNotifications() async {
+    try {
+      await _notificationManager.cancelAllNotifications();
+      await _loadNotificationSettings(); // Recargar la lista
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Todas las notificaciones han sido canceladas'),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al cancelar notificaciones: $e')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Configuración de Notificaciones',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+        ),
+        backgroundColor: const Color(0xFF4A90E2),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      backgroundColor: const Color(0xFFE0FFFF),
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Estado de las notificaciones
+                    _buildNotificationStatusCard(),
+
+                    const SizedBox(height: 20),
+
+                    // Botones de acción
+                    _buildActionButtons(),
+
+                    const SizedBox(height: 20),
+
+                    // Lista de notificaciones pendientes
+                    _buildPendingNotificationsList(),
+                  ],
+                ),
+              ),
+    );
+  }
+
+  Widget _buildNotificationStatusCard() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  _notificationsEnabled
+                      ? Icons.notifications_active
+                      : Icons.notifications_off,
+                  color: _notificationsEnabled ? Colors.green : Colors.red,
+                  size: 28,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Estado de las Notificaciones',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
-                  onPressed: () async {
-                    Navigator.pop(context);
-                    try {
-                      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-                      if (mounted) {
-                        _messenger.showSnackBar(
-                          const SnackBar(content: Text('Se ha enviado un correo para restablecer tu contraseña')),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _notificationsEnabled
+                  ? 'Las notificaciones están habilitadas en tu dispositivo'
+                  : 'Las notificaciones están deshabilitadas en tu dispositivo',
+              style: TextStyle(
+                fontSize: 16,
+                color:
+                    _notificationsEnabled ? Colors.green[700] : Colors.red[700],
+              ),
+            ),
+            if (!_notificationsEnabled) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Para recibir recordatorios, habilita las notificaciones en la configuración de tu dispositivo.',
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _showTestNotification,
+            icon: const Icon(Icons.notification_add),
+            label: const Text('Enviar Notificación de Prueba'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4A90E2),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _loadNotificationSettings,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Actualizar Estado'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed:
+                _pendingNotifications.isNotEmpty
+                    ? _cancelAllNotifications
+                    : null,
+            icon: const Icon(Icons.clear_all),
+            label: const Text('Cancelar Todas las Notificaciones'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPendingNotificationsList() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.schedule, color: Color(0xFF4A90E2)),
+                const SizedBox(width: 8),
+                Text(
+                  'Notificaciones Programadas (${_pendingNotifications.length})',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _pendingNotifications.isEmpty
+                ? const Text(
+                  'No hay notificaciones programadas',
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                )
+                : Column(
+                  children:
+                      _pendingNotifications.take(10).map((notification) {
+                        return ListTile(
+                          leading: const Icon(
+                            Icons.notifications,
+                            color: Color(0xFF4A90E2),
+                          ),
+                          title: Text(notification.title ?? 'Sin título'),
+                          subtitle: Text(
+                            notification.body ?? 'Sin descripción',
+                          ),
+                          trailing: Text(
+                            'ID: ${notification.id}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
                         );
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        _messenger.showSnackBar(
-                          SnackBar(content: Text('Error al enviar el correo: $e')),
-                        );
-                      }
-                    }
-                  },
-                  child: const Text('Cambiar contraseña'),
+                      }).toList(),
+                ),
+            if (_pendingNotifications.length > 10) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Y ${_pendingNotifications.length - 10} más...',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                  fontStyle: FontStyle.italic,
                 ),
               ),
             ],
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 }

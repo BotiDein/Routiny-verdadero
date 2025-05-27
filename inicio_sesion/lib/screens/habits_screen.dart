@@ -20,6 +20,12 @@ class _HabitsScreenState extends State<HabitsScreen> {
   bool _hasError = false;
   String _errorMessage = '';
 
+  // 🔧 MEJORADO: Sistema de protección más robusto contra múltiples toques
+  final Map<String, bool> _habitUpdating = {}; // Track por hábito individual
+  final Map<String, DateTime> _lastUpdateTime =
+      {}; // Tiempo de última actualización por hábito
+  final Map<String, int> _lastStatus = {}; // Último estado por hábito
+
   @override
   void initState() {
     super.initState();
@@ -35,38 +41,40 @@ class _HabitsScreenState extends State<HabitsScreen> {
     });
 
     try {
-      // Primero intentamos cargar desde Firebase
-      _firebaseService.getHabits().listen((habits) {
-        if (mounted) {
-          setState(() {
-            // Ordenar hábitos: primero los no completados, luego los completados
-            habits.sort((a, b) {
-              // Verificar si el hábito está completado para hoy
-              final today = DateTime.now().weekday % 7; // 0-6 (0 = domingo)
-              final aCompleted = a.days[today] == 2;
-              final bCompleted = b.days[today] == 2;
-              
-              // Mover los completados al final
-              if (aCompleted && !bCompleted) return 1;
-              if (!aCompleted && bCompleted) return -1;
-              
-              // Si ambos tienen el mismo estado, mantener el orden original
-              return 0;
+      _firebaseService.getHabits().listen(
+        (habits) {
+          if (mounted) {
+            setState(() {
+              habits.sort((a, b) {
+                final today = DateTime.now().weekday % 7;
+                final aCompleted = a.days[today] == 2;
+                final bCompleted = b.days[today] == 2;
+
+                if (aCompleted && !bCompleted) return 1;
+                if (!aCompleted && bCompleted) return -1;
+
+                return 0;
+              });
+
+              _habits = habits;
+              _isLoading = false;
+
+              // 🔧 NUEVO: Inicializar estados de protección para cada hábito
+              for (var habit in habits) {
+                _habitUpdating[habit.id] = false;
+                final today = DateTime.now().weekday % 7;
+                _lastStatus[habit.id] = habit.days[today];
+              }
+
+              _syncWithLocalStorage(habits);
             });
-            
-            _habits = habits;
-            _isLoading = false;
-            
-            // Sincronizar con almacenamiento local
-            _syncWithLocalStorage(habits);
-          });
-        }
-      }, onError: (e) {
-        // Si hay error en Firebase, intentamos cargar desde almacenamiento local
-        _loadFromLocalStorage();
-      });
+          }
+        },
+        onError: (e) {
+          _loadFromLocalStorage();
+        },
+      );
     } catch (e) {
-      // Si hay cualquier error, intentamos cargar desde almacenamiento local
       _loadFromLocalStorage();
     }
   }
@@ -74,12 +82,19 @@ class _HabitsScreenState extends State<HabitsScreen> {
   Future<void> _loadFromLocalStorage() async {
     try {
       final habits = await _storageService.getHabits();
-      
+
       if (mounted) {
         setState(() {
           _habits = habits;
           _isLoading = false;
           _hasError = false;
+
+          // Inicializar estados de protección
+          for (var habit in habits) {
+            _habitUpdating[habit.id] = false;
+            final today = DateTime.now().weekday % 7;
+            _lastStatus[habit.id] = habit.days[today];
+          }
         });
       }
     } catch (e) {
@@ -102,23 +117,19 @@ class _HabitsScreenState extends State<HabitsScreen> {
     }
   }
 
-// Asegurémonos de que estamos guardando correctamente las fechas en el formato adecuado
-// Modificar el método _formatDate para asegurarnos de que el formato sea correcto
+  String _formatDate(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
 
-String _formatDate(DateTime date) {
-  return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-}
-
-// También vamos a añadir un método de depuración para verificar las fechas guardadas
-// Añadir este método después de _formatDate
-
-void _showDeleteConfirmation(Habit habit) {
+  void _showDeleteConfirmation(Habit habit) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Eliminar hábito'),
-          content: Text('¿Estás seguro de que deseas eliminar el hábito "${habit.name}"?'),
+          content: Text(
+            '¿Estás seguro de que deseas eliminar el hábito "${habit.name}"?',
+          ),
           actions: [
             TextButton(
               onPressed: () {
@@ -131,9 +142,7 @@ void _showDeleteConfirmation(Habit habit) {
                 Navigator.of(context).pop();
                 _deleteHabit(habit);
               },
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
-              ),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
               child: const Text('Eliminar'),
             ),
           ],
@@ -144,18 +153,20 @@ void _showDeleteConfirmation(Habit habit) {
 
   Future<void> _deleteHabit(Habit habit) async {
     try {
-      // Eliminar de Firebase y almacenamiento local
       await _firebaseService.deleteHabit(habit.id);
       await _storageService.deleteHabit(habit.id);
-      
-      // Actualizar UI
+
       setState(() {
         _habits.removeWhere((h) => h.id == habit.id);
+        // Limpiar estados de protección
+        _habitUpdating.remove(habit.id);
+        _lastUpdateTime.remove(habit.id);
+        _lastStatus.remove(habit.id);
       });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Hábito eliminado')),
-      );
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Hábito eliminado')));
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error al eliminar: ${e.toString()}')),
@@ -163,54 +174,122 @@ void _showDeleteConfirmation(Habit habit) {
     }
   }
 
+  // 🔧 ULTRA MEJORADO: Protección robusta contra múltiples toques
   Future<void> _updateHabitStatus(Habit habit, int status) async {
+    final habitId = habit.id;
+    final now = DateTime.now();
+
+    // 1. Verificar si ya se está actualizando este hábito específico
+    if (_habitUpdating[habitId] == true) {
+      print('🚫 Hábito $habitId ya se está actualizando, ignorando toque');
+      return;
+    }
+
+    // 2. Verificar si es el mismo estado que ya tiene
+    final today = DateTime.now().weekday % 7;
+    if (habit.days[today] == status) {
+      print('🚫 Hábito $habitId ya tiene el estado $status, ignorando toque');
+      return;
+    }
+
+    // 3. Verificar tiempo desde última actualización (mínimo 2 segundos)
+    if (_lastUpdateTime[habitId] != null &&
+        now.difference(_lastUpdateTime[habitId]!).inMilliseconds < 2000) {
+      print(
+        '🚫 Hábito $habitId actualizado muy recientemente, ignorando toque',
+      );
+      return;
+    }
+
+    // 4. Verificar si el estado cambió desde la última actualización conocida
+    if (_lastStatus[habitId] != null && _lastStatus[habitId] == status) {
+      print('🚫 Hábito $habitId ya procesó este estado, ignorando toque');
+      return;
+    }
+
+    // Marcar como actualizando INMEDIATAMENTE
+    setState(() {
+      _habitUpdating[habitId] = true;
+    });
+
+    print('✅ Iniciando actualización de hábito $habitId a estado $status');
+
     try {
-      final today = DateTime.now().weekday % 7; // 0-6 (0 = domingo)
       final updatedDays = List<int>.from(habit.days);
       updatedDays[today] = status;
-      
-      // Actualizar el mapa de fechas específicas
+
       final todayStr = _formatDate(DateTime.now());
       final updatedCompletedDates = Map<String, int>.from(habit.completedDates);
-      
+
       if (status > 0) {
         updatedCompletedDates[todayStr] = status;
       } else {
         updatedCompletedDates.remove(todayStr);
       }
-      
+
       final updatedHabit = habit.copyWith(
         days: updatedDays,
         completedDates: updatedCompletedDates,
       );
-      
+
       // Actualizar en Firebase y almacenamiento local
       await _firebaseService.updateHabit(updatedHabit);
       await _storageService.updateHabit(updatedHabit);
-      
-      // Actualizar UI
+
+      // Actualizar UI y estados de protección
       setState(() {
         final index = _habits.indexWhere((h) => h.id == habit.id);
         if (index != -1) {
           _habits[index] = updatedHabit;
         }
+        _lastStatus[habitId] = status;
+        _lastUpdateTime[habitId] = now;
       });
-      
+
       // Mostrar mensaje de confirmación
-      String statusText = status == 0 ? "no completado" : (status == 1 ? "parcialmente completado" : "completado");
+      String statusText =
+          status == 0
+              ? "no completado"
+              : (status == 1 ? "parcialmente completado" : "completado");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Hábito marcado como $statusText')),
+        SnackBar(
+          content: Text('Hábito marcado como $statusText'),
+          duration: const Duration(seconds: 1),
+        ),
       );
+
+      print('✅ Hábito $habitId actualizado exitosamente a estado $status');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
-      );
+      print('❌ Error al actualizar hábito $habitId: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+    } finally {
+      // Liberar el bloqueo después de un delay más largo
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        if (mounted) {
+          setState(() {
+            _habitUpdating[habitId] = false;
+          });
+          print('🔓 Liberado bloqueo para hábito $habitId');
+        }
+      });
     }
   }
 
   void _showRegisterTimeDialog(Habit habit) {
-    // Extraer tiempo actual
-    String currentTime = habit.current is String ? habit.current as String : '00:00:00';
+    // Verificar si ya se está actualizando
+    if (_habitUpdating[habit.id] == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Espera a que termine la actualización anterior'),
+        ),
+      );
+      return;
+    }
+
+    String currentTime =
+        habit.current is String ? habit.current as String : '00:00:00';
     List<String> timeParts = currentTime.split(':');
     int hours = int.tryParse(timeParts[0]) ?? 0;
     int minutes = int.tryParse(timeParts[1]) ?? 0;
@@ -350,73 +429,83 @@ void _showDeleteConfirmation(Habit habit) {
             ),
             TextButton(
               onPressed: () async {
+                // Marcar como actualizando antes de procesar
+                setState(() {
+                  _habitUpdating[habit.id] = true;
+                });
+
                 try {
-                  // Actualizar el tiempo del hábito
-                  final newTime = '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-                  
-                  // Determinar el estado basado en el progreso
+                  final newTime =
+                      '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+
                   int status = 0;
                   if (hours > 0 || minutes > 0 || seconds > 0) {
-                    final goalTime = habit.goal is String ? habit.goal as String : '00:00:00';
-                    
-                    // Comparar con el objetivo
+                    final goalTime =
+                        habit.goal is String
+                            ? habit.goal as String
+                            : '00:00:00';
+
                     List<String> goalParts = goalTime.split(':');
                     int goalHours = int.tryParse(goalParts[0]) ?? 0;
                     int goalMinutes = int.tryParse(goalParts[1]) ?? 0;
                     int goalSeconds = int.tryParse(goalParts[2]) ?? 0;
-                    
+
                     int totalSeconds = hours * 3600 + minutes * 60 + seconds;
-                    int goalTotalSeconds = goalHours * 3600 + goalMinutes * 60 + goalSeconds;
-                    
-                    if (totalSeconds >= goalTotalSeconds && goalTotalSeconds > 0) {
-                      status = 2; // Completado
+                    int goalTotalSeconds =
+                        goalHours * 3600 + goalMinutes * 60 + goalSeconds;
+
+                    if (totalSeconds >= goalTotalSeconds &&
+                        goalTotalSeconds > 0) {
+                      status = 2;
                     } else {
-                      status = 1; // Parcial
+                      status = 1;
                     }
                   }
-                  
-                  // Actualizar el mapa de días
+
                   final updatedDays = List<int>.from(habit.days);
                   final today = DateTime.now().weekday % 7;
                   updatedDays[today] = status;
-                  
-                  // Actualizar el mapa de fechas específicas
+
                   final todayStr = _formatDate(DateTime.now());
-                  final updatedCompletedDates = Map<String, int>.from(habit.completedDates);
+                  final updatedCompletedDates = Map<String, int>.from(
+                    habit.completedDates,
+                  );
                   if (status > 0) {
                     updatedCompletedDates[todayStr] = status;
                   } else {
                     updatedCompletedDates.remove(todayStr);
                   }
-                  
-                  // Actualizar el mapa de tiempos registrados
-                  final updatedRegisteredTimes = Map<String, String>.from(habit.registeredTimes);
+
+                  final updatedRegisteredTimes = Map<String, String>.from(
+                    habit.registeredTimes,
+                  );
                   updatedRegisteredTimes[todayStr] = newTime;
-                  
+
                   final updatedHabit = habit.copyWith(
                     current: newTime,
                     days: updatedDays,
                     completedDates: updatedCompletedDates,
                     registeredTimes: updatedRegisteredTimes,
                   );
-                  
-                  // Actualizar en Firebase y almacenamiento local
+
                   await _firebaseService.updateHabit(updatedHabit);
                   await _storageService.updateHabit(updatedHabit);
-                  
-                  // Actualizar UI
+
                   setState(() {
                     final index = _habits.indexWhere((h) => h.id == habit.id);
                     if (index != -1) {
                       _habits[index] = updatedHabit;
                     }
+                    _lastStatus[habit.id] = status;
+                    _lastUpdateTime[habit.id] = DateTime.now();
                   });
-                  
+
                   Navigator.of(context).pop();
-                  
-                  // Mostrar mensaje de confirmación
+
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Tiempo registrado correctamente')),
+                    const SnackBar(
+                      content: Text('Tiempo registrado correctamente'),
+                    ),
                   );
                 } catch (e) {
                   print('Error al guardar tiempo: $e');
@@ -424,6 +513,15 @@ void _showDeleteConfirmation(Habit habit) {
                     SnackBar(content: Text('Error al guardar: $e')),
                   );
                   Navigator.of(context).pop();
+                } finally {
+                  // Liberar bloqueo
+                  Future.delayed(const Duration(milliseconds: 1000), () {
+                    if (mounted) {
+                      setState(() {
+                        _habitUpdating[habit.id] = false;
+                      });
+                    }
+                  });
                 }
               },
               child: const Text('Guardar'),
@@ -434,53 +532,38 @@ void _showDeleteConfirmation(Habit habit) {
     );
   }
 
-// También vamos a añadir un método de depuración para verificar las fechas guardadas
-// Añadir este método después de _formatDate
-
-// void _debugPrintCompletedDates(Habit habit) {
-//   print('Hábito: ${habit.name}');
-//   print('Fechas completadas:');
-//   habit.completedDates.forEach((date, status) {
-//     print('  $date: $status');
-//   });
-// }
-
   void _navigateToHabitForm({Habit? habit}) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => HabitFormScreen(
-          habit: habit,
-          isEditing: habit != null,
-        ),
+        builder:
+            (context) =>
+                HabitFormScreen(habit: habit, isEditing: habit != null),
       ),
     );
 
     if (result != null && result is Habit) {
       try {
         if (habit != null) {
-          // Actualizar hábito existente
           await _firebaseService.updateHabit(result);
           await _storageService.updateHabit(result);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Hábito actualizado correctamente')),
           );
         } else {
-          // Añadir nuevo hábito
           await _firebaseService.addHabit(result);
           await _storageService.addHabit(result);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Hábito creado correctamente')),
           );
         }
-        
-        // Recargar hábitos
+
         _loadHabits();
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: ${e.toString()}')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
         }
       }
     }
@@ -490,75 +573,73 @@ void _showDeleteConfirmation(Habit habit) {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        color: const Color(0xFFE0FFFF), // Fondo azul claro
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _hasError
+        color: const Color(0xFFE0FFFF),
+        child:
+            _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _hasError
                 ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Ocurrió un error',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _errorMessage,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _loadHabits,
-                          child: const Text('Reintentar'),
-                        ),
-                      ],
-                    ),
-                  )
-                : _habits.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.spa,
-                              size: 80,
-                              color: Colors.grey,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No hay hábitos pendientes',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Toca el botón + para añadir un hábito',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _habits.length,
-                        itemBuilder: (context, index) {
-                          final habit = _habits[index];
-                          return _buildHabitCard(habit);
-                        },
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: Colors.red,
                       ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Ocurrió un error',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _errorMessage,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadHabits,
+                        child: const Text('Reintentar'),
+                      ),
+                    ],
+                  ),
+                )
+                : _habits.isEmpty
+                ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.spa, size: 80, color: Colors.grey),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No hay hábitos pendientes',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Toca el botón + para añadir un hábito',
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                )
+                : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _habits.length,
+                  itemBuilder: (context, index) {
+                    final habit = _habits[index];
+                    return _buildHabitCard(habit);
+                  },
+                ),
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF0047AB), // Azul oscuro
+        backgroundColor: const Color(0xFF0047AB),
         onPressed: () => _navigateToHabitForm(),
         child: const Icon(Icons.add, color: Colors.white),
       ),
@@ -566,11 +647,11 @@ void _showDeleteConfirmation(Habit habit) {
   }
 
   Widget _buildHabitCard(Habit habit) {
-    final today = DateTime.now().weekday % 7; // 0-6 (0 = domingo)
+    final today = DateTime.now().weekday % 7;
     final isCompleted = habit.days[today] == 2;
     final isPartial = habit.days[today] == 1;
-    
-    // Determinar el color según el estado
+    final isUpdating = _habitUpdating[habit.id] ?? false;
+
     Color statusColor;
     if (isCompleted) {
       statusColor = Colors.green;
@@ -579,23 +660,20 @@ void _showDeleteConfirmation(Habit habit) {
     } else {
       statusColor = Colors.grey;
     }
-    
-    // Verificar si hay tiempo registrado para hoy
+
     final todayStr = _formatDate(DateTime.now());
     final hasRegisteredTime = habit.registeredTimes.containsKey(todayStr);
-    final registeredTime = hasRegisteredTime ? habit.registeredTimes[todayStr] : null;
-    
+    final registeredTime =
+        hasRegisteredTime ? habit.registeredTimes[todayStr] : null;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: statusColor.withOpacity(0.5),
-          width: 1,
-        ),
+        side: BorderSide(color: statusColor.withOpacity(0.5), width: 1),
       ),
-      color: const Color(0xFFB3E5FC), // Color azul claro para las tarjetas
+      color: const Color(0xFFB3E5FC),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -603,7 +681,6 @@ void _showDeleteConfirmation(Habit habit) {
           children: [
             Row(
               children: [
-                // Icono de categoría
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -617,8 +694,7 @@ void _showDeleteConfirmation(Habit habit) {
                   ),
                 ),
                 const SizedBox(width: 12),
-                
-                // Título y descripción
+
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -643,8 +719,7 @@ void _showDeleteConfirmation(Habit habit) {
                     ],
                   ),
                 ),
-                
-                // Menú de opciones
+
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert),
                   onSelected: (value) {
@@ -654,48 +729,44 @@ void _showDeleteConfirmation(Habit habit) {
                       _showDeleteConfirmation(habit);
                     }
                   },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit, color: Color(0xFF4A90E2)),
-                          SizedBox(width: 8),
-                          Text('Editar'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text('Eliminar'),
-                        ],
-                      ),
-                    ),
-                  ],
+                  itemBuilder:
+                      (context) => [
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit, color: Color(0xFF4A90E2)),
+                              SizedBox(width: 8),
+                              Text('Editar'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('Eliminar'),
+                            ],
+                          ),
+                        ),
+                      ],
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 16),
-            
-            // Progreso y detalles
+
             Row(
               children: [
-                // Tipo de hábito y objetivo
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         _getHabitTypeText(habit),
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[700],
-                        ),
+                        style: TextStyle(fontSize: 14, color: Colors.grey[700]),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -705,7 +776,6 @@ void _showDeleteConfirmation(Habit habit) {
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      // Mostrar tiempo registrado si existe
                       if (habit.type == 'time' && registeredTime != null) ...[
                         const SizedBox(height: 4),
                         Text(
@@ -720,94 +790,72 @@ void _showDeleteConfirmation(Habit habit) {
                     ],
                   ),
                 ),
-                
-                // Botones según el tipo de hábito
+
+                // 🔧 ULTRA MEJORADO: Botones con protección visual y funcional
                 if (habit.type == 'time')
                   ElevatedButton.icon(
-                    onPressed: () => _showRegisterTimeDialog(habit),
-                    icon: const Icon(Icons.timer),
-                    label: const Text('Registrar'),
+                    onPressed:
+                        isUpdating
+                            ? null
+                            : () => _showRegisterTimeDialog(habit),
+                    icon:
+                        isUpdating
+                            ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                            : const Icon(Icons.timer),
+                    label: Text(isUpdating ? 'Guardando...' : 'Registrar'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0047AB), // Azul oscuro
+                      backgroundColor:
+                          isUpdating ? Colors.grey : const Color(0xFF0047AB),
                       foregroundColor: Colors.white,
                     ),
                   )
                 else
-                  // Botones de estado para hábitos booleanos
+                  // 🔧 ULTRA MEJORADO: Botones con protección completa
                   Row(
                     children: [
                       // Botón de no completado
-                      GestureDetector(
-                        onTap: () => _updateHabitStatus(habit, 0),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: habit.days[today] == 0 
-                                ? Colors.grey 
-                                : Colors.grey.withOpacity(0.2),
-                          ),
-                          child: Icon(
-                            Icons.close,
-                            color: habit.days[today] == 0 
-                                ? Colors.white 
-                                : Colors.grey,
-                            size: 20,
-                          ),
-                        ),
+                      _buildStatusButton(
+                        habit: habit,
+                        targetStatus: 0,
+                        currentStatus: habit.days[today],
+                        icon: Icons.close,
+                        color: Colors.grey,
+                        isUpdating: isUpdating,
                       ),
                       const SizedBox(width: 8),
-                      
+
                       // Botón de parcialmente completado
-                      GestureDetector(
-                        onTap: () => _updateHabitStatus(habit, 1),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: habit.days[today] == 1 
-                                ? Colors.orange 
-                                : Colors.orange.withOpacity(0.2),
-                          ),
-                          child: Icon(
-                            Icons.remove,
-                            color: habit.days[today] == 1 
-                                ? Colors.white 
-                                : Colors.orange,
-                            size: 20,
-                          ),
-                        ),
+                      _buildStatusButton(
+                        habit: habit,
+                        targetStatus: 1,
+                        currentStatus: habit.days[today],
+                        icon: Icons.remove,
+                        color: Colors.orange,
+                        isUpdating: isUpdating,
                       ),
                       const SizedBox(width: 8),
-                      
+
                       // Botón de completado
-                      GestureDetector(
-                        onTap: () => _updateHabitStatus(habit, 2),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: habit.days[today] == 2 
-                                ? Colors.green 
-                                : Colors.green.withOpacity(0.2),
-                          ),
-                          child: Icon(
-                            Icons.check,
-                            color: habit.days[today] == 2 
-                                ? Colors.white 
-                                : Colors.green,
-                            size: 20,
-                          ),
-                        ),
+                      _buildStatusButton(
+                        habit: habit,
+                        targetStatus: 2,
+                        currentStatus: habit.days[today],
+                        icon: Icons.check,
+                        color: Colors.green,
+                        isUpdating: isUpdating,
+                        showProgress: true,
                       ),
                     ],
                   ),
               ],
             ),
-            
+
             const SizedBox(height: 12),
-            
-            // Días de la semana
+
             Container(
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
               decoration: BoxDecoration(
@@ -825,30 +873,78 @@ void _showDeleteConfirmation(Habit habit) {
     );
   }
 
+  // 🆕 NUEVO: Widget para botones de estado con protección completa
+  Widget _buildStatusButton({
+    required Habit habit,
+    required int targetStatus,
+    required int currentStatus,
+    required IconData icon,
+    required Color color,
+    required bool isUpdating,
+    bool showProgress = false,
+  }) {
+    final isActive = currentStatus == targetStatus;
+    final isDisabled = isUpdating || isActive;
+
+    return GestureDetector(
+      onTap: isDisabled ? null : () => _updateHabitStatus(habit, targetStatus),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 200),
+        opacity: isDisabled ? 0.5 : 1.0,
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isActive ? color : color.withOpacity(0.2),
+            border:
+                isUpdating && isActive
+                    ? Border.all(color: Colors.blue, width: 2)
+                    : null,
+          ),
+          child:
+              isUpdating && isActive && showProgress
+                  ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                  : Icon(
+                    icon,
+                    color: isActive ? Colors.white : color,
+                    size: 20,
+                  ),
+        ),
+      ),
+    );
+  }
+
   List<Widget> _buildDayIndicators(Habit habit) {
     final days = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
-    final today = DateTime.now().weekday % 7; // 0-6 (0 = domingo)
-    
+    final today = DateTime.now().weekday % 7;
+
     return List.generate(7, (index) {
-      // Determinar el color según el estado
       Color color;
       final status = habit.days[index];
-      
+
       if (status == 2) {
-        color = Colors.green; // Completado
+        color = Colors.green;
       } else if (status == 1) {
-        color = Colors.orange; // Parcial
+        color = Colors.orange;
       } else {
-        color = Colors.red; // No completado
+        color = Colors.red;
       }
-      
+
       return Container(
         width: 30,
         height: 30,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: color,
-          border: index == today ? Border.all(color: Colors.black, width: 2) : null,
+          border:
+              index == today ? Border.all(color: Colors.black, width: 2) : null,
         ),
         child: Center(
           child: Text(

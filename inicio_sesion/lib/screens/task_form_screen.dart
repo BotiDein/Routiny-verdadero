@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/task.dart';
 import '../services/firebase_service.dart';
+import '../services/notification_manager.dart';
 
 class TaskFormScreen extends StatefulWidget {
   final Task? task;
@@ -10,8 +12,8 @@ class TaskFormScreen extends StatefulWidget {
   final DateTime? initialDate;
 
   const TaskFormScreen({
-    super.key, 
-    this.task, 
+    super.key,
+    this.task,
     this.isEditing = false,
     this.initialDate,
   });
@@ -28,6 +30,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   late TimeOfDay _selectedTime;
   String _selectedCategory = 'General';
   int _selectedPriority = 2;
+  bool _hasReminder = false; // 🆕 NUEVO: Switch para recordatorio
 
   final List<String> _categories = [
     'General',
@@ -39,6 +42,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   ];
 
   late FirebaseService _firebaseService;
+  final NotificationManager _notificationManager =
+      NotificationManager(); // 🆕 NUEVO
   bool _isLoading = false;
 
   @override
@@ -60,6 +65,33 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       _selectedTime = TimeOfDay.fromDateTime(widget.task!.date);
       _selectedCategory = widget.task!.category;
       _selectedPriority = widget.task!.priority;
+      _loadReminderStatus(); // 🆕 NUEVO: Cargar estado del recordatorio
+    }
+  }
+
+  // 🆕 NUEVO: Cargar estado del recordatorio desde SharedPreferences
+  Future<void> _loadReminderStatus() async {
+    if (widget.task != null) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final hasReminder =
+            prefs.getBool('reminder_${widget.task!.id}') ?? false;
+        setState(() {
+          _hasReminder = hasReminder;
+        });
+      } catch (e) {
+        print('Error loading reminder status: $e');
+      }
+    }
+  }
+
+  // 🆕 NUEVO: Guardar estado del recordatorio en SharedPreferences
+  Future<void> _saveReminderStatus(String taskId, bool hasReminder) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('reminder_$taskId', hasReminder);
+    } catch (e) {
+      print('Error saving reminder status: $e');
     }
   }
 
@@ -188,6 +220,130 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     );
   }
 
+  // 🆕 NUEVO: Validar si la fecha/hora es futura
+  bool _isFutureDateTime(DateTime dateTime) {
+    return dateTime.isAfter(DateTime.now());
+  }
+
+  // 🆕 NUEVO: Mostrar alerta para fechas pasadas
+  void _showPastDateAlert() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('⚠️ Fecha en el pasado'),
+          content: const Text(
+            'La fecha y hora seleccionadas ya han pasado. Las notificaciones solo se programan para fechas futuras.\n\n¿Qué deseas hacer?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                // Programar para mañana a la misma hora
+                setState(() {
+                  _selectedDate = DateTime.now().add(const Duration(days: 1));
+                });
+              },
+              child: const Text('Mañana'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                // Ajustar a hora actual + 1 hora
+                final now = DateTime.now();
+                setState(() {
+                  _selectedDate = now;
+                  _selectedTime = TimeOfDay.fromDateTime(
+                    now.add(const Duration(hours: 1)),
+                  );
+                });
+              },
+              child: const Text('En 1 hora'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 🆕 NUEVO: Programar notificación de tarea
+  Future<void> _scheduleTaskNotification(Task task) async {
+    if (!_hasReminder) return;
+
+    try {
+      // Verificar si la fecha es futura
+      if (!_isFutureDateTime(task.date)) {
+        print('⚠️ No se programa notificación: fecha en el pasado');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ Notificación no programada: fecha en el pasado'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      await _notificationManager.scheduleTaskNotification(task);
+      await _saveReminderStatus(task.id, true);
+
+      print(
+        '✅ Notificación programada para: ${DateFormat('dd/MM/yyyy HH:mm').format(task.date)}',
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '🔔 Notificación programada para ${DateFormat('dd/MM HH:mm').format(task.date)}',
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      print('❌ Error al programar notificación: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al programar notificación: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // 🆕 NUEVO: Cancelar notificación de tarea
+  Future<void> _cancelTaskNotification(String taskId) async {
+    try {
+      await _notificationManager.cancelTaskNotification(taskId);
+      await _saveReminderStatus(taskId, false);
+      print('✅ Notificación cancelada para tarea: $taskId');
+    } catch (e) {
+      print('❌ Error al cancelar notificación: $e');
+    }
+  }
+
+  // 🆕 NUEVO: Probar notificación inmediata
+  Future<void> _testNotification() async {
+    try {
+      await _notificationManager.showTestNotification();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('🔔 Notificación de prueba enviada'),
+          backgroundColor: Colors.blue,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error en notificación de prueba: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   // Mostrar diálogo de confirmación para eliminar tarea
   void _showDeleteConfirmation() {
     showDialog(
@@ -195,7 +351,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Eliminar tarea'),
-          content: Text('¿Estás seguro de que deseas eliminar la tarea "${widget.task!.title}"?'),
+          content: Text(
+            '¿Estás seguro de que deseas eliminar la tarea "${widget.task!.title}"?',
+          ),
           actions: [
             TextButton(
               onPressed: () {
@@ -208,9 +366,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 Navigator.of(context).pop();
                 _deleteTask();
               },
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
-              ),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
               child: const Text('Eliminar'),
             ),
           ],
@@ -222,17 +378,22 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   // Eliminar tarea
   Future<void> _deleteTask() async {
     if (widget.task == null) return;
-    
+
     setState(() {
       _isLoading = true;
     });
 
     try {
+      // 🆕 NUEVO: Cancelar notificación al eliminar
+      if (_hasReminder) {
+        await _cancelTaskNotification(widget.task!.id);
+      }
+
       await _firebaseService.deleteTask(widget.task!.id);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tarea eliminada')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Tarea eliminada')));
         Navigator.pop(context, true); // Regresar a la pantalla anterior
       }
     } catch (e) {
@@ -259,26 +420,31 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       return;
     }
 
+    // 🆕 NUEVO: Validar fecha si tiene recordatorio
+    final combinedDateTime = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+      _selectedTime.hour,
+      _selectedTime.minute,
+    );
+
+    if (_hasReminder && !_isFutureDateTime(combinedDateTime)) {
+      _showPastDateAlert();
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Combinar fecha y hora
-      final dateTime = DateTime(
-        _selectedDate.year,
-        _selectedDate.month,
-        _selectedDate.day,
-        _selectedTime.hour,
-        _selectedTime.minute,
-      );
-
       final task =
           widget.isEditing
               ? widget.task!.copyWith(
                 title: _titleController.text,
                 description: _descriptionController.text,
-                date: dateTime,
+                date: combinedDateTime,
                 category: _selectedCategory,
                 priority: _selectedPriority,
               )
@@ -286,11 +452,27 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 id: DateTime.now().millisecondsSinceEpoch.toString(),
                 title: _titleController.text,
                 description: _descriptionController.text,
-                date: dateTime,
+                date: combinedDateTime,
                 createdAt: DateTime.now(),
                 category: _selectedCategory,
                 priority: _selectedPriority,
               );
+
+      // 🆕 NUEVO: Manejar notificaciones
+      if (widget.isEditing && widget.task != null) {
+        // Si estamos editando, cancelar la notificación anterior
+        await _cancelTaskNotification(widget.task!.id);
+
+        // Si la nueva tarea tiene recordatorio, programarlo
+        if (_hasReminder && !task.isCompleted) {
+          await _scheduleTaskNotification(task);
+        }
+      } else {
+        // Si es una nueva tarea con recordatorio, programarlo
+        if (_hasReminder) {
+          await _scheduleTaskNotification(task);
+        }
+      }
 
       if (widget.isEditing) {
         await _firebaseService.updateTask(task);
@@ -302,7 +484,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(widget.isEditing ? 'Tarea actualizada' : 'Tarea creada'),
+            content: Text(
+              widget.isEditing ? 'Tarea actualizada' : 'Tarea creada',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -312,7 +496,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('La tarea se guardó localmente. Se sincronizará cuando haya conexión.'),
+            content: Text(
+              'La tarea se guardó localmente. Se sincronizará cuando haya conexión.',
+            ),
             backgroundColor: Colors.orange,
             duration: const Duration(seconds: 3),
           ),
@@ -348,6 +534,14 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        // 🆕 NUEVO: Botón de prueba de notificaciones
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_active, color: Colors.white),
+            onPressed: _testNotification,
+            tooltip: 'Probar notificación',
+          ),
+        ],
       ),
       body: SafeArea(
         child: Container(
@@ -480,6 +674,132 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                       ),
                       const SizedBox(height: 20),
 
+                      // 🆕 NUEVO: Switch para recordatorio
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.notifications,
+                              color: Color(0xFF4A90E2),
+                            ),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'Recordatorio',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            Switch(
+                              value: _hasReminder,
+                              onChanged: (value) {
+                                setState(() {
+                                  _hasReminder = value;
+                                });
+                              },
+                              activeColor: const Color(0xFF4A90E2),
+                            ),
+                            // 🆕 NUEVO: Botón de prueba junto al switch
+                            if (_hasReminder) ...[
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.play_arrow,
+                                  color: Color(0xFF4A90E2),
+                                ),
+                                onPressed: _testNotification,
+                                tooltip: 'Probar notificación',
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+
+                      // 🆕 NUEVO: Información del recordatorio
+                      if (_hasReminder) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4A90E2).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: const Color(0xFF4A90E2).withOpacity(0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _isFutureDateTime(
+                                      DateTime(
+                                        _selectedDate.year,
+                                        _selectedDate.month,
+                                        _selectedDate.day,
+                                        _selectedTime.hour,
+                                        _selectedTime.minute,
+                                      ),
+                                    )
+                                    ? Icons.check_circle
+                                    : Icons.warning,
+                                color:
+                                    _isFutureDateTime(
+                                          DateTime(
+                                            _selectedDate.year,
+                                            _selectedDate.month,
+                                            _selectedDate.day,
+                                            _selectedTime.hour,
+                                            _selectedTime.minute,
+                                          ),
+                                        )
+                                        ? Colors.green
+                                        : Colors.orange,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _isFutureDateTime(
+                                        DateTime(
+                                          _selectedDate.year,
+                                          _selectedDate.month,
+                                          _selectedDate.day,
+                                          _selectedTime.hour,
+                                          _selectedTime.minute,
+                                        ),
+                                      )
+                                      ? 'Se enviará notificación el ${DateFormat('dd/MM/yyyy').format(_selectedDate)} a las ${_selectedTime.format(context)}'
+                                      : '⚠️ Fecha en el pasado - No se programará notificación',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color:
+                                        _isFutureDateTime(
+                                              DateTime(
+                                                _selectedDate.year,
+                                                _selectedDate.month,
+                                                _selectedDate.day,
+                                                _selectedTime.hour,
+                                                _selectedTime.minute,
+                                              ),
+                                            )
+                                            ? const Color(0xFF4A90E2)
+                                            : Colors.orange,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+
                       // Categoría
                       const Text(
                         'Categoría',
@@ -578,8 +898,6 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                  
-                    
                     // Botón de eliminar (solo en modo edición)
                     if (widget.isEditing)
                       ElevatedButton(
@@ -591,7 +909,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                         ),
                         child: const Text('Eliminar'),
                       ),
-                    
+
                     // Botón de guardar/crear
                     ElevatedButton(
                       onPressed: _isLoading ? null : _saveTask,

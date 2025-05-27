@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/task.dart';
 import '../services/firebase_service.dart';
+import '../services/notification_manager.dart';
 import 'task_form_screen.dart';
 import '../services/local_storage_service.dart';
 
@@ -15,9 +17,13 @@ class AgendaScreen extends StatefulWidget {
 
 class _AgendaScreenState extends State<AgendaScreen> {
   late FirebaseService _firebaseService;
+  final NotificationManager _notificationManager =
+      NotificationManager(); // 🆕 NUEVO
   Map<String, List<Task>> _tasksByDate = {};
+  Map<String, bool> _taskReminders = {}; // 🆕 NUEVO: Mapa de recordatorios
   bool _isLoading = true;
   Task? _lastDeletedTask; // Para almacenar la última tarea eliminada
+  bool _lastDeletedTaskHadReminder = false; // 🆕 NUEVO
 
   @override
   void initState() {
@@ -26,6 +32,32 @@ class _AgendaScreenState extends State<AgendaScreen> {
     final userId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
     _firebaseService = FirebaseService(userId);
     _loadTasks();
+    _loadReminders(); // 🆕 NUEVO
+  }
+
+  // 🆕 NUEVO: Cargar recordatorios desde SharedPreferences
+  Future<void> _loadReminders() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final keys = prefs.getKeys().where((key) => key.startsWith('reminder_'));
+
+      for (final key in keys) {
+        final taskId = key.replaceFirst('reminder_', '');
+        final hasReminder = prefs.getBool(key) ?? false;
+        _taskReminders[taskId] = hasReminder;
+      }
+
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      print('Error loading reminders: $e');
+    }
+  }
+
+  // 🆕 NUEVO: Verificar si una tarea tiene recordatorio
+  bool _hasReminder(String taskId) {
+    return _taskReminders[taskId] ?? false;
   }
 
   // Modificar el método _loadTasks para manejar mejor los errores
@@ -36,28 +68,8 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
     try {
       // Escuchar cambios en las tareas
-      _firebaseService.getTasks().listen((tasks) {
-        if (mounted) {
-          setState(() {
-            // Agrupar tareas por fecha
-            _tasksByDate = {};
-            for (var task in tasks) {
-              final dateKey = DateFormat('yyyy-MM-dd').format(task.date);
-              if (!_tasksByDate.containsKey(dateKey)) {
-                _tasksByDate[dateKey] = [];
-              }
-              _tasksByDate[dateKey]!.add(task);
-            }
-            _isLoading = false;
-          });
-        }
-      }, onError: (error) async {
-        print('Error al cargar tareas: $error');
-        // En caso de error, intentar cargar desde almacenamiento local
-        try {
-          final localStorageService = LocalStorageService();
-          final tasks = await localStorageService.getTasks();
-          
+      _firebaseService.getTasks().listen(
+        (tasks) {
           if (mounted) {
             setState(() {
               // Agrupar tareas por fecha
@@ -71,38 +83,63 @@ class _AgendaScreenState extends State<AgendaScreen> {
               }
               _isLoading = false;
             });
-            
-            // Mostrar mensaje al usuario
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Mostrando tareas guardadas localmente. Algunas funciones pueden estar limitadas sin conexión.'),
-                duration: Duration(seconds: 5),
-                backgroundColor: Colors.orange,
-              ),
-            );
           }
-        } catch (e) {
-          if (mounted) {
-            setState(() {
-              _isLoading = false;
-            });
-            
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Error al cargar tareas: $e'),
-                backgroundColor: Colors.red,
-              ),
-            );
+        },
+        onError: (error) async {
+          print('Error al cargar tareas: $error');
+          // En caso de error, intentar cargar desde almacenamiento local
+          try {
+            final localStorageService = LocalStorageService();
+            final tasks = await localStorageService.getTasks();
+
+            if (mounted) {
+              setState(() {
+                // Agrupar tareas por fecha
+                _tasksByDate = {};
+                for (var task in tasks) {
+                  final dateKey = DateFormat('yyyy-MM-dd').format(task.date);
+                  if (!_tasksByDate.containsKey(dateKey)) {
+                    _tasksByDate[dateKey] = [];
+                  }
+                  _tasksByDate[dateKey]!.add(task);
+                }
+                _isLoading = false;
+              });
+
+              // Mostrar mensaje al usuario
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Mostrando tareas guardadas localmente. Algunas funciones pueden estar limitadas sin conexión.',
+                  ),
+                  duration: Duration(seconds: 5),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            }
+          } catch (e) {
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+              });
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error al cargar tareas: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
           }
-        }
-      });
+        },
+      );
     } catch (e) {
       print('Error general al cargar tareas: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error al cargar tareas: $e'),
@@ -123,8 +160,8 @@ class _AgendaScreenState extends State<AgendaScreen> {
     );
 
     if (result == true) {
-      // La tarea se guardó correctamente, no necesitamos hacer nada
-      // ya que estamos escuchando cambios en Firestore
+      // La tarea se guardó correctamente, recargar recordatorios
+      _loadReminders(); // 🆕 NUEVO
     }
   }
 
@@ -135,8 +172,19 @@ class _AgendaScreenState extends State<AgendaScreen> {
   Future<void> _deleteTask(Task task) async {
     // Guardar la tarea antes de eliminarla para poder restaurarla
     _lastDeletedTask = task;
+    _lastDeletedTaskHadReminder = _hasReminder(task.id); // 🆕 NUEVO
 
     try {
+      // 🆕 NUEVO: Cancelar notificación si la tarea tenía recordatorio
+      if (_lastDeletedTaskHadReminder) {
+        await _notificationManager.cancelTaskNotification(task.id);
+
+        // Remover del mapa de recordatorios
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('reminder_${task.id}');
+        _taskReminders.remove(task.id);
+      }
+
       await _firebaseService.deleteTask(task.id);
 
       // Mostrar SnackBar con opción de deshacer
@@ -146,7 +194,19 @@ class _AgendaScreenState extends State<AgendaScreen> {
         ).clearSnackBars(); // Limpiar SnackBars anteriores
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Tarea eliminada'),
+            content: Row(
+              children: [
+                const Icon(Icons.delete, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _lastDeletedTaskHadReminder
+                        ? 'Tarea y notificación eliminadas'
+                        : 'Tarea eliminada',
+                  ),
+                ),
+              ],
+            ),
             action: SnackBarAction(
               label: 'DESHACER',
               onPressed: () {
@@ -175,14 +235,54 @@ class _AgendaScreenState extends State<AgendaScreen> {
         // Restaurar la tarea eliminada
         await _firebaseService.addTask(_lastDeletedTask!);
 
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Tarea restaurada')));
+        // 🆕 NUEVO: Restaurar notificación si la tenía
+        if (_lastDeletedTaskHadReminder) {
+          try {
+            await _notificationManager.scheduleTaskNotification(
+              _lastDeletedTask!,
+            );
+
+            // Restaurar en SharedPreferences
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setBool('reminder_${_lastDeletedTask!.id}', true);
+            _taskReminders[_lastDeletedTask!.id] = true;
+
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Row(
+                    children: [
+                      Icon(Icons.restore, color: Colors.white),
+                      SizedBox(width: 8),
+                      Text('Tarea y notificación restauradas'),
+                    ],
+                  ),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
+          } catch (e) {
+            print('Error al restaurar notificación: $e');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Tarea restaurada (sin notificación)'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            }
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('Tarea restaurada')));
+          }
         }
 
         // Limpiar la referencia a la tarea eliminada
         _lastDeletedTask = null;
+        _lastDeletedTaskHadReminder = false;
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -196,6 +296,44 @@ class _AgendaScreenState extends State<AgendaScreen> {
   Future<void> _toggleTaskCompletion(Task task) async {
     try {
       await _firebaseService.toggleTaskCompletion(task.id, !task.isCompleted);
+
+      // 🆕 NUEVO: Manejar notificaciones al completar/descompletar
+      if (_hasReminder(task.id)) {
+        if (!task.isCompleted) {
+          // Si se está completando la tarea, cancelar notificación
+          await _notificationManager.cancelTaskNotification(task.id);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text('Tarea completada - Notificación cancelada'),
+                ],
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          // Si se está descompletando, reprogramar notificación si es futura
+          final updatedTask = task.copyWith(isCompleted: false);
+          if (updatedTask.date.isAfter(DateTime.now())) {
+            await _notificationManager.scheduleTaskNotification(updatedTask);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Row(
+                  children: [
+                    Icon(Icons.notifications_active, color: Colors.white),
+                    SizedBox(width: 8),
+                    Text('Tarea reactivada - Notificación reprogramada'),
+                  ],
+                ),
+                backgroundColor: Colors.blue,
+              ),
+            );
+          }
+        }
+      }
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -526,6 +664,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
         priorityColor = Colors.orange;
     }
 
+    // 🆕 NUEVO: Verificar si tiene recordatorio
+    final hasReminder = _hasReminder(task.id);
+
     return Dismissible(
       key: Key(task.id),
       background: Container(
@@ -590,17 +731,35 @@ class _AgendaScreenState extends State<AgendaScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        task.title,
-                        style: TextStyle(
-                          fontSize: bodyFontSize,
-                          fontWeight: FontWeight.w500,
-                          decoration:
-                              task.isCompleted
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                          color: task.isCompleted ? Colors.grey : Colors.black,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              task.title,
+                              style: TextStyle(
+                                fontSize: bodyFontSize,
+                                fontWeight: FontWeight.w500,
+                                decoration:
+                                    task.isCompleted
+                                        ? TextDecoration.lineThrough
+                                        : null,
+                                color:
+                                    task.isCompleted
+                                        ? Colors.grey
+                                        : Colors.black,
+                              ),
+                            ),
+                          ),
+                          // 🆕 NUEVO: Indicador de recordatorio
+                          if (hasReminder) ...[
+                            const SizedBox(width: 8),
+                            Icon(
+                              Icons.notifications_active,
+                              size: smallFontSize * 1.2,
+                              color: const Color(0xFF4A90E2),
+                            ),
+                          ],
+                        ],
                       ),
                       if (task.description.isNotEmpty) ...[
                         const SizedBox(height: 4),
@@ -657,6 +816,28 @@ class _AgendaScreenState extends State<AgendaScreen> {
                               ),
                             ),
                           ),
+                          // 🆕 NUEVO: Badge de recordatorio
+                          if (hasReminder) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF4A90E2).withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'Recordatorio',
+                                style: TextStyle(
+                                  fontSize: smallFontSize * 0.8,
+                                  color: const Color(0xFF4A90E2),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ],
