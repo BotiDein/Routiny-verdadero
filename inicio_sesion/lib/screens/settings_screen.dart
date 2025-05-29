@@ -95,7 +95,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             if (!_isLoadingStreak && _currentStreak > 0)
               SizedBox(height: scaleHeight(20)),
 
-            // 🔧 CORREGIDO: Navegación a pantalla de notificaciones
             _buildConfigItem(
               Icons.notifications,
               'Notificaciones',
@@ -397,15 +396,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (user == null) return;
 
     try {
-      final userDoc =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .get();
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
       final userData = userDoc.data();
 
       final name = userData?['name'] ?? 'Desconocido';
       final email = user.email ?? 'Sin correo';
+      final isGuest = user.isAnonymous;
 
       showDialog(
         context: context,
@@ -465,37 +464,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Center(
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF005BBB),
+                      backgroundColor: isGuest 
+                          ? Colors.grey // Color de fondo para invitados
+                          : const Color(0xFF005BBB), // Color normal para usuarios registrados
+                      foregroundColor: isGuest 
+                          ? Colors.grey[800] // Color del texto para invitados (gris oscuro)
+                          : Colors.white, // Color del texto para usuarios registrados
                       padding: const EdgeInsets.symmetric(
                         horizontal: 24,
                         vertical: 12,
                       ),
                     ),
-                    onPressed: () async {
-                      Navigator.pop(context);
-                      try {
-                        await FirebaseAuth.instance.sendPasswordResetEmail(
-                          email: email,
-                        );
-                        if (mounted) {
-                          _messenger.showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Se ha enviado un correo para restablecer tu contraseña',
+                    onPressed: isGuest
+                        ? () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Esta función no está disponible para los invitados'),
                               ),
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          _messenger.showSnackBar(
-                            SnackBar(
-                              content: Text('Error al enviar el correo: $e'),
-                            ),
-                          );
-                        }
-                      }
-                    },
+                            );
+                          }
+                        : () async {
+                            Navigator.pop(context);
+                            try {
+                              await FirebaseAuth.instance.sendPasswordResetEmail(
+                                email: email,
+                              );
+                              if (mounted) {
+                                _messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Se ha enviado un correo para restablecer tu contraseña',
+                                    ),
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                _messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error al enviar el correo: $e'),
+                                  ),
+                                );
+                              }
+                            }
+                          },
                     child: const Text('Cambiar contraseña'),
                   ),
                 ),
@@ -512,7 +524,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-// 🆕 NUEVA: Pantalla de configuración de notificaciones
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
 
@@ -572,7 +583,7 @@ class _NotificationSettingsScreenState
   Future<void> _cancelAllNotifications() async {
     try {
       await _notificationManager.cancelAllNotifications();
-      await _loadNotificationSettings(); // Recargar la lista
+      await _loadNotificationSettings();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Todas las notificaciones han sido canceladas'),
@@ -600,29 +611,21 @@ class _NotificationSettingsScreenState
         ),
       ),
       backgroundColor: const Color(0xFFE0FFFF),
-      body:
-          _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Estado de las notificaciones
-                    _buildNotificationStatusCard(),
-
-                    const SizedBox(height: 20),
-
-                    // Botones de acción
-                    _buildActionButtons(),
-
-                    const SizedBox(height: 20),
-
-                    // Lista de notificaciones pendientes
-                    _buildPendingNotificationsList(),
-                  ],
-                ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildNotificationStatusCard(),
+                  const SizedBox(height: 20),
+                  _buildActionButtons(),
+                  const SizedBox(height: 20),
+                  _buildPendingNotificationsList(),
+                ],
               ),
+            ),
     );
   }
 
@@ -661,8 +664,7 @@ class _NotificationSettingsScreenState
                   : 'Las notificaciones están deshabilitadas en tu dispositivo',
               style: TextStyle(
                 fontSize: 16,
-                color:
-                    _notificationsEnabled ? Colors.green[700] : Colors.red[700],
+                color: _notificationsEnabled ? Colors.green[700] : Colors.red[700],
               ),
             ),
             if (!_notificationsEnabled) ...[
@@ -712,10 +714,9 @@ class _NotificationSettingsScreenState
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed:
-                _pendingNotifications.isNotEmpty
-                    ? _cancelAllNotifications
-                    : null,
+            onPressed: _pendingNotifications.isNotEmpty
+                ? _cancelAllNotifications
+                : null,
             icon: const Icon(Icons.clear_all),
             label: const Text('Cancelar Todas las Notificaciones'),
             style: ElevatedButton.styleFrom(
@@ -754,31 +755,30 @@ class _NotificationSettingsScreenState
             const SizedBox(height: 12),
             _pendingNotifications.isEmpty
                 ? const Text(
-                  'No hay notificaciones programadas',
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
-                )
+                    'No hay notificaciones programadas',
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  )
                 : Column(
-                  children:
-                      _pendingNotifications.take(10).map((notification) {
-                        return ListTile(
-                          leading: const Icon(
-                            Icons.notifications,
-                            color: Color(0xFF4A90E2),
+                    children: _pendingNotifications.take(10).map((notification) {
+                      return ListTile(
+                        leading: const Icon(
+                          Icons.notifications,
+                          color: Color(0xFF4A90E2),
+                        ),
+                        title: Text(notification.title ?? 'Sin título'),
+                        subtitle: Text(
+                          notification.body ?? 'Sin descripción',
+                        ),
+                        trailing: Text(
+                          'ID: ${notification.id}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
                           ),
-                          title: Text(notification.title ?? 'Sin título'),
-                          subtitle: Text(
-                            notification.body ?? 'Sin descripción',
-                          ),
-                          trailing: Text(
-                            'ID: ${notification.id}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
             if (_pendingNotifications.length > 10) ...[
               const SizedBox(height: 8),
               Text(

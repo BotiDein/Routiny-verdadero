@@ -8,43 +8,41 @@ class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
 
   void _showGuestDialog(BuildContext context) {
-  showDialog(
-    context: context,
-    builder: (BuildContext dialogContext) => AlertDialog(
-      title: const Text('Advertencia'),
-      content: const Text('Si se borra la app, los datos no quedarán guardados.'),
-      actions: [
-        TextButton(
-          child: const Text('Cancelar'),
-          onPressed: () => Navigator.pop(dialogContext),
-        ),
-        TextButton(
-          child: const Text('¿Seguro que quieres seguir?'),
-          onPressed: () async {
-            Navigator.pop(dialogContext);
-            await FirebaseAuth.instance.signInAnonymously();
-            Navigator.pushReplacement(
-              context, // <--- usa este context
-              MaterialPageRoute(builder: (_) => const MainScreen()),
-            );
-          },
-        ),
-      ],
-    ),
-  );
-}
-
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('Advertencia'),
+        content: const Text('Si se borra la app, los datos no quedarán guardados.'),
+        actions: [
+          TextButton(
+            child: const Text('Cancelar'),
+            onPressed: () => Navigator.pop(dialogContext),
+          ),
+          TextButton(
+            child: const Text('¿Seguro que quieres seguir?'),
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await FirebaseAuth.instance.signInAnonymously();
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const MainScreen()),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    
-    // Calcular tamaños relativos
+
     final buttonWidth = screenWidth * 0.7;
     final buttonHeight = screenHeight * 0.06;
-    final fontSize = screenWidth * 0.04;
-    
+    final fontSize = screenWidth * 0.045;
+
     return Scaffold(
       backgroundColor: Colors.cyan[50],
       body: Center(
@@ -59,6 +57,8 @@ class LandingPage extends StatelessWidget {
                 color: Colors.blue,
               ),
               SizedBox(height: screenHeight * 0.04),
+
+              // Botón Invitado
               SizedBox(
                 width: buttonWidth,
                 height: buttonHeight,
@@ -71,18 +71,24 @@ class LandingPage extends StatelessWidget {
                     ),
                   ),
                   onPressed: () => _showGuestDialog(context),
-                  child: Text(
-                    '¿Quieres iniciar sesión como invitado?',
-                    style: TextStyle(fontSize: fontSize),
+                  child: Center(
+                    child: Text(
+                      '¿Quieres iniciar sesión como invitado?',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: fontSize),
+                    ),
                   ),
                 ),
               ),
               SizedBox(height: screenHeight * 0.02),
+
               Text(
                 'o',
                 style: TextStyle(fontSize: fontSize),
               ),
               SizedBox(height: screenHeight * 0.02),
+
+              // Botón Correo
               SizedBox(
                 width: buttonWidth,
                 height: buttonHeight,
@@ -98,13 +104,17 @@ class LandingPage extends StatelessWidget {
                     context,
                     MaterialPageRoute(builder: (_) => const LoginPage()),
                   ),
-                  child: Text(
-                    '¿Quieres iniciar sesión con un correo?',
-                    style: TextStyle(fontSize: fontSize),
+                  child: Center(
+                    child: Text(
+                      '¿Quieres iniciar sesión con un correo?',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: fontSize),
+                    ),
                   ),
                 ),
               ),
               SizedBox(height: screenHeight * 0.04),
+
               TextButton(
                 onPressed: () => Navigator.push(
                   context,
