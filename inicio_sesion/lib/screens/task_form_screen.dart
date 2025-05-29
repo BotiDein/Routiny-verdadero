@@ -324,26 +324,6 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     }
   }
 
-  // 🆕 NUEVO: Probar notificación inmediata
-  Future<void> _testNotification() async {
-    try {
-      await _notificationManager.showTestNotification();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('🔔 Notificación de prueba enviada'),
-          backgroundColor: Colors.blue,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error en notificación de prueba: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
   // Mostrar diálogo de confirmación para eliminar tarea
   void _showDeleteConfirmation() {
     showDialog(
@@ -535,13 +515,6 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         // 🆕 NUEVO: Botón de prueba de notificaciones
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_active, color: Colors.white),
-            onPressed: _testNotification,
-            tooltip: 'Probar notificación',
-          ),
-        ],
       ),
       body: SafeArea(
         child: Container(
@@ -708,17 +681,6 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                               activeColor: const Color(0xFF4A90E2),
                             ),
                             // 🆕 NUEVO: Botón de prueba junto al switch
-                            if (_hasReminder) ...[
-                              const SizedBox(width: 8),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.play_arrow,
-                                  color: Color(0xFF4A90E2),
-                                ),
-                                onPressed: _testNotification,
-                                tooltip: 'Probar notificación',
-                              ),
-                            ],
                           ],
                         ),
                       ),
