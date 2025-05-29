@@ -254,8 +254,8 @@ class NotificationService {
       // Cancelar notificación existente
       await cancelTaskNotification(task.id);
 
-      // Programar notificación 15 minutos antes
-      final notificationTime = task.date.subtract(const Duration(minutes: 15));
+      // Programar notificación 5 minutos antes
+      final notificationTime = task.date.subtract(const Duration(minutes: 5));
       final now = DateTime.now();
 
       if (notificationTime.isBefore(now)) {
@@ -306,7 +306,7 @@ class NotificationService {
 
       await flutterLocalNotificationsPlugin.zonedSchedule(
         notificationId,
-        '📋 Tarea en 15 minutos - $priorityText',
+        '📋 Tarea en 5 minutos - $priorityText',
         '${task.title}\n${task.description.isNotEmpty ? task.description : 'Categoría: ${task.category}'}',
         scheduledDate,
         notificationDetails,
