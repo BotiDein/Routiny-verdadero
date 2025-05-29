@@ -90,12 +90,40 @@ class _HobbiesScreenState extends State<HobbiesScreen> {
                     child: CircularProgressIndicator(),
                   )
                 : _hobbies.isEmpty
-                    ? const Center(
-                      child: Text(
-                        'No hay hobbies registrados.\nPresiona el botón + para agregar uno.',
-                        textAlign: TextAlign.center,
-                      ),
-                    )
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.self_improvement, // Puedes cambiarlo por otro si prefieres
+                                size: MediaQuery.of(context).size.width * 0.25,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(height: 24),
+                              const Text(
+                                'No hay hobbies registrados',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Toca el botón + para agregar tu primer hobby',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
                     : ListView.builder(
                       itemCount: _hobbies.length,
                       itemBuilder: (context, index) {
