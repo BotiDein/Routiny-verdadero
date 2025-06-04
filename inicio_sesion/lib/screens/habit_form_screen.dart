@@ -126,7 +126,7 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
           content: StatefulBuilder(
             builder: (BuildContext context, StateSetter setState) {
               return SizedBox(
-                height: 180,
+                height: 190,
                 child: Column(
                   children: [
                     const Text('Selecciona el tiempo objetivo:'),
@@ -280,7 +280,7 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
           content: StatefulBuilder(
             builder: (BuildContext context, StateSetter setState) {
               return SizedBox(
-                height: 180,
+                height: 210,
                 child: Column(
                   children: [
                     const Text('¿Cuánto tiempo dedicaste hoy a este hábito?'),
