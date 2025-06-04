@@ -303,7 +303,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
           content: StatefulBuilder(
             builder: (BuildContext context, StateSetter setState) {
               return SizedBox(
-                height: 180,
+                height: 200,
                 child: Column(
                   children: [
                     const Text('Selecciona el tiempo a registrar:'),

@@ -113,313 +113,293 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
     super.dispose();
   }
 
-  void _showTimePickerDialog() {
-    int hours = _hours;
-    int minutes = _minutes;
-    int seconds = _seconds;
-    
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Seleccionar Tiempo'),
-          content: StatefulBuilder(
-            builder: (BuildContext context, StateSetter setState) {
-              return SizedBox(
-                height: 190,
-                child: Column(
-                  children: [
-                    const Text('Selecciona el tiempo objetivo:'),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        // Horas
-                        Column(
+void _showTimePickerDialog() {
+  int hours = _hours;
+  int minutes = _minutes;
+  int seconds = _seconds;
+  
+  final screenWidth = MediaQuery.of(context).size.width;
+  final isSmallScreen = screenWidth < 360;
+  final timeSelectorSize = isSmallScreen ? screenWidth * 0.2 : 80.0;
+  final fontSize = isSmallScreen ? 18.0 : 24.0;
+  
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: const Text('Seleccionar Tiempo'),
+        content: StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            return SizedBox(
+              height: isSmallScreen ? 170 : 190,
+              child: Column(
+                children: [
+                  const Text('Selecciona el tiempo objetivo:'),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      // Horas
+                      SizedBox(
+                        width: timeSelectorSize,
+                        child: Column(
                           children: [
                             const Text('Horas'),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_drop_up),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (hours < 23) hours++;
-                                    });
-                                  },
-                                ),
-                              ],
+                            IconButton(
+                              icon: const Icon(Icons.arrow_drop_up),
+                              onPressed: () {
+                                setState(() {
+                                  if (hours < 23) hours++;
+                                });
+                              },
                             ),
                             Text(
                               hours.toString().padLeft(2, '0'),
-                              style: const TextStyle(fontSize: 24),
+                              style: TextStyle(fontSize: fontSize),
                             ),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_drop_down),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (hours > 0) hours--;
-                                    });
-                                  },
-                                ),
-                              ],
+                            IconButton(
+                              icon: const Icon(Icons.arrow_drop_down),
+                              onPressed: () {
+                                setState(() {
+                                  if (hours > 0) hours--;
+                                });
+                              },
                             ),
                           ],
                         ),
-                        // Minutos
-                        Column(
+                      ),
+                      // Minutos
+                      SizedBox(
+                        width: timeSelectorSize,
+                        child: Column(
                           children: [
                             const Text('Minutos'),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_drop_up),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (minutes < 59) minutes++;
-                                    });
-                                  },
-                                ),
-                              ],
+                            IconButton(
+                              icon: const Icon(Icons.arrow_drop_up),
+                              onPressed: () {
+                                setState(() {
+                                  if (minutes < 59) minutes++;
+                                });
+                              },
                             ),
                             Text(
                               minutes.toString().padLeft(2, '0'),
-                              style: const TextStyle(fontSize: 24),
+                              style: TextStyle(fontSize: fontSize),
                             ),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_drop_down),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (minutes > 0) minutes--;
-                                    });
-                                  },
-                                ),
-                              ],
+                            IconButton(
+                              icon: const Icon(Icons.arrow_drop_down),
+                              onPressed: () {
+                                setState(() {
+                                  if (minutes > 0) minutes--;
+                                });
+                              },
                             ),
                           ],
                         ),
-                        // Segundos
-                        Column(
+                      ),
+                      // Segundos
+                      SizedBox(
+                        width: timeSelectorSize,
+                        child: Column(
                           children: [
                             const Text('Segundos'),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_drop_up),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (seconds < 59) seconds++;
-                                    });
-                                  },
-                                ),
-                              ],
+                            IconButton(
+                              icon: const Icon(Icons.arrow_drop_up),
+                              onPressed: () {
+                                setState(() {
+                                  if (seconds < 59) seconds++;
+                                });
+                              },
                             ),
                             Text(
                               seconds.toString().padLeft(2, '0'),
-                              style: const TextStyle(fontSize: 24),
+                              style: TextStyle(fontSize: fontSize),
                             ),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_drop_down),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (seconds > 0) seconds--;
-                                    });
-                                  },
-                                ),
-                              ],
+                            IconButton(
+                              icon: const Icon(Icons.arrow_drop_down),
+                              onPressed: () {
+                                setState(() {
+                                  if (seconds > 0) seconds--;
+                                });
+                              },
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
             },
+            child: const Text('Cancelar'),
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _hours = hours;
-                  _minutes = minutes;
-                  _seconds = seconds;
-                });
-                Navigator.of(context).pop();
-              },
-              child: const Text('Aceptar'),
-            ),
-          ],
-        );
-      },
-    );
-  }
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _hours = hours;
+                _minutes = minutes;
+                _seconds = seconds;
+              });
+              Navigator.of(context).pop();
+            },
+            child: const Text('Aceptar'),
+          ),
+        ],
+      );
+    },
+  );
+}
 
-  void _showRegisteredTimePickerDialog() {
-    int hours = _regHours;
-    int minutes = _regMinutes;
-    int seconds = _regSeconds;
-    
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Registrar Tiempo'),
-          content: StatefulBuilder(
-            builder: (BuildContext context, StateSetter setState) {
-              return SizedBox(
-                height: 210,
-                child: Column(
-                  children: [
-                    const Text('¿Cuánto tiempo dedicaste hoy a este hábito?'),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        // Horas
-                        Column(
+void _showRegisteredTimePickerDialog() {
+  int hours = _regHours;
+  int minutes = _regMinutes;
+  int seconds = _regSeconds;
+  
+  final screenWidth = MediaQuery.of(context).size.width;
+  final isSmallScreen = screenWidth < 360;
+  final timeSelectorSize = isSmallScreen ? screenWidth * 0.2 : 80.0;
+  final fontSize = isSmallScreen ? 18.0 : 24.0;
+  
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: const Text('Registrar Tiempo'),
+        content: StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            return SizedBox(
+              height: isSmallScreen ? 180 : 210,
+              child: Column(
+                children: [
+                  const Text('¿Cuánto tiempo dedicaste hoy a este hábito?'),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      // Horas
+                      SizedBox(
+                        width: timeSelectorSize,
+                        child: Column(
                           children: [
                             const Text('Horas'),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_drop_up),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (hours < 23) hours++;
-                                    });
-                                  },
-                                ),
-                              ],
+                            IconButton(
+                              icon: const Icon(Icons.arrow_drop_up),
+                              onPressed: () {
+                                setState(() {
+                                  if (hours < 23) hours++;
+                                });
+                              },
                             ),
                             Text(
                               hours.toString().padLeft(2, '0'),
-                              style: const TextStyle(fontSize: 24),
+                              style: TextStyle(fontSize: fontSize),
                             ),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_drop_down),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (hours > 0) hours--;
-                                    });
-                                  },
-                                ),
-                              ],
+                            IconButton(
+                              icon: const Icon(Icons.arrow_drop_down),
+                              onPressed: () {
+                                setState(() {
+                                  if (hours > 0) hours--;
+                                });
+                              },
                             ),
                           ],
                         ),
-                        // Minutos
-                        Column(
+                      ),
+                      // Minutos
+                      SizedBox(
+                        width: timeSelectorSize,
+                        child: Column(
                           children: [
                             const Text('Minutos'),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_drop_up),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (minutes < 59) minutes++;
-                                    });
-                                  },
-                                ),
-                              ],
+                            IconButton(
+                              icon: const Icon(Icons.arrow_drop_up),
+                              onPressed: () {
+                                setState(() {
+                                  if (minutes < 59) minutes++;
+                                });
+                              },
                             ),
                             Text(
                               minutes.toString().padLeft(2, '0'),
-                              style: const TextStyle(fontSize: 24),
+                              style: TextStyle(fontSize: fontSize),
                             ),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_drop_down),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (minutes > 0) minutes--;
-                                    });
-                                  },
-                                ),
-                              ],
+                            IconButton(
+                              icon: const Icon(Icons.arrow_drop_down),
+                              onPressed: () {
+                                setState(() {
+                                  if (minutes > 0) minutes--;
+                                });
+                              },
                             ),
                           ],
                         ),
-                        // Segundos
-                        Column(
+                      ),
+                      // Segundos
+                      SizedBox(
+                        width: timeSelectorSize,
+                        child: Column(
                           children: [
                             const Text('Segundos'),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_drop_up),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (seconds < 59) seconds++;
-                                    });
-                                  },
-                                ),
-                              ],
+                            IconButton(
+                              icon: const Icon(Icons.arrow_drop_up),
+                              onPressed: () {
+                                setState(() {
+                                  if (seconds < 59) seconds++;
+                                });
+                              },
                             ),
                             Text(
                               seconds.toString().padLeft(2, '0'),
-                              style: const TextStyle(fontSize: 24),
+                              style: TextStyle(fontSize: fontSize),
                             ),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_drop_down),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (seconds > 0) seconds--;
-                                    });
-                                  },
-                                ),
-                              ],
+                            IconButton(
+                              icon: const Icon(Icons.arrow_drop_down),
+                              onPressed: () {
+                                setState(() {
+                                  if (seconds > 0) seconds--;
+                                });
+                              },
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
             },
+            child: const Text('Cancelar'),
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _regHours = hours;
-                  _regMinutes = minutes;
-                  _regSeconds = seconds;
-                });
-                Navigator.of(context).pop();
-              },
-              child: const Text('Guardar'),
-            ),
-          ],
-        );
-      },
-    );
-  }
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _regHours = hours;
+                _regMinutes = minutes;
+                _regSeconds = seconds;
+              });
+              Navigator.of(context).pop();
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      );
+    },
+  );
+}
 
   String get _formattedTime {
     return '${_hours.toString().padLeft(2, '0')}:${_minutes.toString().padLeft(2, '0')}:${_seconds.toString().padLeft(2, '0')}';
