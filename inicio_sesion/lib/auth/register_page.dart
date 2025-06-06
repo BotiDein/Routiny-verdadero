@@ -66,16 +66,29 @@ class _RegisterPageState extends State<RegisterPage> {
       MaterialPageRoute(builder: (_) => const MainScreen()),
     );
   } on FirebaseAuthException catch (e) {
-    if (!mounted) return;
-    setState(() => error = e.message ?? 'Error');
-  } catch (e) {
-    if (!mounted) return;
-    setState(() => error = 'Error al guardar los datos: $e');
-  } finally {
-    if (mounted) {
-      setState(() => isLoading = false);
-    }
+  if (!mounted) return;
+
+  String errorMessage;
+
+  switch (e.code) {
+    case 'email-already-in-use':
+      errorMessage = 'Este correo ya está en uso.';
+      break;
+    case 'invalid-email':
+      errorMessage = 'El correo electrónico no es válido.';
+      break;
+    case 'operation-not-allowed':
+      errorMessage = 'La creación de cuentas está deshabilitada.';
+      break;
+    case 'weak-password':
+      errorMessage = 'La contraseña es demasiado débil.';
+      break;
+    default:
+      errorMessage = 'Ocurrió un error: ${e.message}';
   }
+
+  setState(() => error = errorMessage);
+}
 }
 
   @override

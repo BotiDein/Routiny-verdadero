@@ -26,31 +26,72 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  Future<void> loginWithEmail() async {
+ Future<void> loginWithEmail() async {
+  if (!mounted) return;
+
+  final email = emailController.text.trim();
+  final password = passwordController.text.trim();
+
+  // Validación manual
+  if (email.isEmpty || password.isEmpty) {
+    setState(() {
+      error = 'Por favor, completa todos los campos.';
+    });
+    return;
+  }
+
+  // Validación básica de formato de correo
+  final emailRegex = RegExp(r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$");
+  if (!emailRegex.hasMatch(email)) {
+    setState(() {
+      error = 'El formato del correo no es válido.';
+    });
+    return;
+  }
+
+  setState(() => isLoading = true);
+
+  try {
+    await FirebaseAuth.instance.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+
     if (!mounted) return;
 
-    setState(() => isLoading = true);
-    try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
-      );
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const MainScreen()),
+    );
+  } on FirebaseAuthException catch (e) {
+    if (!mounted) return;
 
-      if (!mounted) return;
+    String mensajeError;
+    switch (e.code) {
+      case 'user-not-found':
+        mensajeError = 'No se encontró una cuenta con ese correo.';
+        break;
+      case 'wrong-password':
+        mensajeError = 'La contraseña es incorrecta.';
+        break;
+      case 'invalid-email':
+        mensajeError = 'El correo electrónico es inválido.';
+        break;
+      case 'too-many-requests':
+        mensajeError = 'Demasiados intentos. Inténtalo más tarde.';
+        break;
+      default:
+        mensajeError = e.message ?? 'Ocurrió un error al iniciar sesión.';
+    }
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MainScreen()),
-      );
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      setState(() => error = e.message ?? 'Error');
-    } finally {
-      if (mounted) {
-        setState(() => isLoading = false);
-      }
+    setState(() => error = mensajeError);
+  } finally {
+    if (mounted) {
+      setState(() => isLoading = false);
     }
   }
+}
+
 
   Future<void> loginWithGoogle() async {
   if (!mounted) return;
