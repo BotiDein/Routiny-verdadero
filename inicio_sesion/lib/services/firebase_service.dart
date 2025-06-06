@@ -327,8 +327,11 @@ Future<List<Habit>> getHabitsFuture() async {
     if (hobby.registeredTimes.isNotEmpty) {
       for (final timeEntry in hobby.registeredTimes) {
         if (timeEntry is Map && timeEntry.containsKey('date')) {
-          final date = DateTime.parse(timeEntry['date']);
-          if (date.isAfter(DateTime.now())) {
+          final date = timeEntry['date'] is String
+              ? DateTime.parse(timeEntry['date'])
+              : timeEntry['date'];
+
+          if (date != null && date.isAfter(DateTime.now())) {
             await _notificationManager.scheduleHobbyNotification(hobby, date);
           }
         }
