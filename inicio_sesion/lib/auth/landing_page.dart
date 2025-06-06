@@ -10,27 +10,30 @@ class LandingPage extends StatelessWidget {
   void _showGuestDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        title: const Text('Advertencia'),
-        content: const Text('Si se borra la app, los datos no quedarán guardados.'),
-        actions: [
-          TextButton(
-            child: const Text('Cancelar'),
-            onPressed: () => Navigator.pop(dialogContext),
+      builder:
+          (BuildContext dialogContext) => AlertDialog(
+            title: const Text('Advertencia'),
+            content: const Text(
+              'Si se borra la app, los datos no quedarán guardados.¿Seguro que quieres seguir?',
+            ),
+            actions: [
+              TextButton(
+                child: const Text('Cancelar'),
+                onPressed: () => Navigator.pop(dialogContext),
+              ),
+              TextButton(
+                child: const Text('Continuar'),
+                onPressed: () async {
+                  Navigator.pop(dialogContext);
+                  await FirebaseAuth.instance.signInAnonymously();
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (_) => const MainScreen()),
+                  );
+                },
+              ),
+            ],
           ),
-          TextButton(
-            child: const Text('¿Seguro que quieres seguir?'),
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              await FirebaseAuth.instance.signInAnonymously();
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const MainScreen()),
-              );
-            },
-          ),
-        ],
-      ),
     );
   }
 
@@ -51,11 +54,7 @@ class LandingPage extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.person,
-                size: screenWidth * 0.3,
-                color: Colors.blue,
-              ),
+              Icon(Icons.person, size: screenWidth * 0.3, color: Colors.blue),
               SizedBox(height: screenHeight * 0.04),
 
               // Botón Invitado
@@ -82,10 +81,7 @@ class LandingPage extends StatelessWidget {
               ),
               SizedBox(height: screenHeight * 0.02),
 
-              Text(
-                'o',
-                style: TextStyle(fontSize: fontSize),
-              ),
+              Text('o', style: TextStyle(fontSize: fontSize)),
               SizedBox(height: screenHeight * 0.02),
 
               // Botón Correo
@@ -100,10 +96,11 @@ class LandingPage extends StatelessWidget {
                       borderRadius: BorderRadius.circular(screenWidth * 0.02),
                     ),
                   ),
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const LoginPage()),
-                  ),
+                  onPressed:
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const LoginPage()),
+                      ),
                   child: Center(
                     child: Text(
                       '¿Quieres iniciar sesión con un correo?',
@@ -116,10 +113,11 @@ class LandingPage extends StatelessWidget {
               SizedBox(height: screenHeight * 0.04),
 
               TextButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const RegisterPage()),
-                ),
+                onPressed:
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const RegisterPage()),
+                    ),
                 child: Text(
                   '¿No te has registrado aun?\nDa clic aquí',
                   textAlign: TextAlign.center,
@@ -128,7 +126,7 @@ class LandingPage extends StatelessWidget {
                     color: const Color(0xFF0052A9),
                   ),
                 ),
-              )
+              ),
             ],
           ),
         ),
