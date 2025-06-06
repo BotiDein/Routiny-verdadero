@@ -28,9 +28,7 @@ class _CategoryDialogState extends State<CategoryDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 0,
       backgroundColor: Colors.transparent,
       child: contentBox(context),
@@ -57,10 +55,7 @@ class _CategoryDialogState extends State<CategoryDialog> {
         children: [
           const Text(
             'Selecciona una categoría',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
           SizedBox(
@@ -72,12 +67,13 @@ class _CategoryDialogState extends State<CategoryDialog> {
               itemBuilder: (context, index) {
                 final category = widget.categories[index];
                 final isSelected = category == _currentSelectedCategory;
-                
+
                 return ListTile(
                   title: Text(
                     category,
                     style: TextStyle(
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
                   leading: Radio<String>(
@@ -107,14 +103,8 @@ class _CategoryDialogState extends State<CategoryDialog> {
           ),
           const SizedBox(height: 16),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              TextButton(
-                onPressed: () {
-                  _showAddCategoryDialog(context);
-                },
-                child: const Text('Crear o Editar'),
-              ),
               ElevatedButton(
                 onPressed: () {
                   widget.onCategorySelected(_currentSelectedCategory);
@@ -136,11 +126,38 @@ class _CategoryDialogState extends State<CategoryDialog> {
   void _showAddCategoryDialog(BuildContext context) {
     final TextEditingController categoryController = TextEditingController();
     String selectedEmoji = '😊';
-    
+
     final List<String> emojis = [
-      '😊', '🏃', '🧠', '📚', '💼', '🍎', '💪', '🧘', '🎯', '⚽',
-      '🎮', '🎨', '🎵', '🍳', '🌱', '💻', '🏠', '🚗', '✈️', '🛒',
-      '💰', '🎓', '🔬', '🧪', '🧬', '🔭', '📱', '📷', '🎬', '📺',
+      '😊',
+      '🏃',
+      '🧠',
+      '📚',
+      '💼',
+      '🍎',
+      '💪',
+      '🧘',
+      '🎯',
+      '⚽',
+      '🎮',
+      '🎨',
+      '🎵',
+      '🍳',
+      '🌱',
+      '💻',
+      '🏠',
+      '🚗',
+      '✈️',
+      '🛒',
+      '💰',
+      '🎓',
+      '🔬',
+      '🧪',
+      '🧬',
+      '🔭',
+      '📱',
+      '📷',
+      '🎬',
+      '📺',
     ];
 
     showDialog(
@@ -172,10 +189,7 @@ class _CategoryDialogState extends State<CategoryDialog> {
                     const SizedBox(height: 20),
                     const Text(
                       'Nueva categoría',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.deepPurple,
-                      ),
+                      style: TextStyle(fontSize: 16, color: Colors.deepPurple),
                     ),
                     TextField(
                       controller: categoryController,
@@ -220,9 +234,10 @@ class _CategoryDialogState extends State<CategoryDialog> {
                               width: 50,
                               margin: const EdgeInsets.all(5),
                               decoration: BoxDecoration(
-                                color: selectedEmoji == emojis[index]
-                                    ? Colors.blue.withOpacity(0.2)
-                                    : Colors.transparent,
+                                color:
+                                    selectedEmoji == emojis[index]
+                                        ? Colors.blue.withOpacity(0.2)
+                                        : Colors.transparent,
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Center(
@@ -255,16 +270,20 @@ class _CategoryDialogState extends State<CategoryDialog> {
                             trailing: IconButton(
                               icon: const Icon(Icons.delete, color: Colors.red),
                               onPressed: () {
-                                List<String> updatedCategories = List.from(widget.categories);
+                                List<String> updatedCategories = List.from(
+                                  widget.categories,
+                                );
                                 updatedCategories.removeAt(index);
-                                
+
                                 // Actualizar la categoría seleccionada si es necesario
-                                if (_currentSelectedCategory == widget.categories[index]) {
+                                if (_currentSelectedCategory ==
+                                    widget.categories[index]) {
                                   if (updatedCategories.isNotEmpty) {
-                                    _currentSelectedCategory = updatedCategories[0];
+                                    _currentSelectedCategory =
+                                        updatedCategories[0];
                                   }
                                 }
-                                
+
                                 setState(() {
                                   widget.categories.removeAt(index);
                                 });
@@ -289,7 +308,9 @@ class _CategoryDialogState extends State<CategoryDialog> {
                           onPressed: () {
                             if (categoryController.text.isNotEmpty) {
                               setState(() {
-                                widget.categories.add('$selectedEmoji ${categoryController.text}');
+                                widget.categories.add(
+                                  '$selectedEmoji ${categoryController.text}',
+                                );
                               });
                               Navigator.of(context).pop();
                             }
