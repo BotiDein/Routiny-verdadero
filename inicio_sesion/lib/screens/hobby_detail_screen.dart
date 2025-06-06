@@ -236,11 +236,9 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
             ),
               TextButton(
                 onPressed: () async {
-                  // 1. Construir el nuevo registro de tiempo
                   final newTime =
-                    '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+                      '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
 
-                  // 2. Actualizar datos locales
                   _registeredTimes.add({
                     'date': DateTime.now(),
                     'time': newTime,
@@ -254,18 +252,19 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
                   _calculateTotalTime();
                   _checkGoalCompletion();
 
-                  // 3. Guardar en storage local y en Firebase
-                  await _updateAndSaveHobby(); // <- Usa await para esperar que se complete
-
-                  // 4. Actualizar UI
                   setState(() {});
 
-                  // 5. Cerrar el diálogo
                   Navigator.of(context).pop();
+
+                  // Guardar en segundo plano, sin bloquear UI
+                  try {
+                    await _updateAndSaveHobby();
+                  } catch (e) {
+                    print('Error al guardar hobby en background: $e');
+                  }
                 },
                 child: const Text('Guardar'),
               ),
-
           ],
         );
       },

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/firebase_service.dart';
 import '../services/local_storage_service.dart';
 import '../models/hobby.dart';
@@ -20,7 +21,8 @@ class HobbyFormScreen extends StatefulWidget {
 
 class _HobbyFormScreenState extends State<HobbyFormScreen> {
   final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _weeklyGoalController = TextEditingController();
+  final TextEditingController _weeklyGoalHoursController = TextEditingController();
+  final TextEditingController _weeklyGoalMinutesController = TextEditingController();
   
   String _selectedEmoji = '😊';
   
@@ -43,7 +45,10 @@ class _HobbyFormScreenState extends State<HobbyFormScreen> {
       if (widget.hobby!['weeklyGoal'] != null) {
         final parts = widget.hobby!['weeklyGoal'].split(':');
         if (parts.length >= 1) {
-          _weeklyGoalController.text = parts[0].padLeft(2, '0'); // Tomamos solo las horas
+          _weeklyGoalHoursController.text = parts[0].padLeft(2, '0');
+          if (parts.length > 1) {
+            _weeklyGoalMinutesController.text = parts[1].padLeft(2, '0');
+          }
         }
       }
     }
@@ -52,7 +57,8 @@ class _HobbyFormScreenState extends State<HobbyFormScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _weeklyGoalController.dispose();
+    _weeklyGoalHoursController.dispose();
+    _weeklyGoalMinutesController.dispose();
     super.dispose();
   }
   
@@ -155,25 +161,51 @@ class _HobbyFormScreenState extends State<HobbyFormScreen> {
               
               // Meta semanal
               const Text(
-                'Meta semanal (horas)',
+                'Meta semanal',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 8),
-              TextField(
-                controller: _weeklyGoalController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  hintText: 'Ej: 5',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _weeklyGoalHoursController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: InputDecoration(
+                        labelText: 'Horas',
+                        hintText: 'Ej: 5',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                    ),
                   ),
-                  filled: true,
-                  fillColor: Colors.white,
-                ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextField(
+                      controller: _weeklyGoalMinutesController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: InputDecoration(
+                        labelText: 'Minutos',
+                        hintText: 'Ej: 30',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const Spacer(),
               
@@ -189,39 +221,45 @@ class _HobbyFormScreenState extends State<HobbyFormScreen> {
                       return;
                     }
 
-                    // 2) Construye el objeto Hobby usando los valores del Map si editas
-                    final hoursText = _weeklyGoalController.text.isNotEmpty
-                      ? _weeklyGoalController.text.padLeft(2, '0')
-                      : '05';
+                    // 1. Leer horas y minutos de los controladores
+                    final hours = int.tryParse(_weeklyGoalHoursController.text) ?? 0;
+                    final minutes = int.tryParse(_weeklyGoalMinutesController.text) ?? 0;
 
+                    // 2. Convertir a formato HH:MM:SS
+                    final formattedWeeklyGoal = '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:00';
+
+                    // 3. Construir el hobby
                     final hobby = Hobby(
-                      id: widget.isEditing && widget.hobby != null && widget.hobby!.containsKey('id')
-                          ? widget.hobby!['id'] as String              // <-- getter corregido
+                      id: widget.isEditing &&
+                              widget.hobby != null &&
+                              widget.hobby is Map<String, dynamic> &&
+                              widget.hobby!.containsKey('id')
+                          ? widget.hobby!['id'] as String
                           : DateTime.now().millisecondsSinceEpoch.toString(),
                       name: _nameController.text,
                       icon: _selectedEmoji,
                       time: '00:00:00',
-                      weeklyGoal: '$hoursText:00:00',
-                      registeredTimes: widget.isEditing
-                          && widget.hobby != null
-                          && widget.hobby!.containsKey('registeredTimes')
-                        ? List<Map<String, dynamic>>.from(widget.hobby!['registeredTimes'] as List)
-                        : <Map<String, dynamic>>[],                   // <-- getter corregido
-                      activeDays: widget.isEditing
-                          && widget.hobby != null
-                          && widget.hobby!.containsKey('activeDays')
-                        ? List<int>.from(widget.hobby!['activeDays'] as List)
-                        : <int>[],                                    // <-- getter corregido
+                      weeklyGoal: formattedWeeklyGoal, // ✅ esta es la correcta
+                      registeredTimes: widget.isEditing &&
+                              widget.hobby != null &&
+                              widget.hobby!.containsKey('registeredTimes')
+                          ? List<Map<String, dynamic>>.from(widget.hobby!['registeredTimes'] as List)
+                          : <Map<String, dynamic>>[],
+                      activeDays: widget.isEditing &&
+                              widget.hobby != null &&
+                              widget.hobby!.containsKey('activeDays')
+                          ? List<int>.from(widget.hobby!['activeDays'] as List)
+                          : <int>[],
                     );
 
-                    // 3) Guarda primero localmente, luego en Firebase
+                    // 4. Guardar localmente y en Firebase
                     final localStorage = LocalStorageService();
                     await localStorage.addHobby(hobby);
 
                     final firebaseService = FirebaseService();
                     await firebaseService.saveSingleUserHobby(hobby);
 
-                    // 4) Finalmente retorna el objeto Hobby a la pantalla anterior
+                    // 5. Volver con el nuevo hobby
                     Navigator.pop(context, hobby);
                   },
                   style: ElevatedButton.styleFrom(
