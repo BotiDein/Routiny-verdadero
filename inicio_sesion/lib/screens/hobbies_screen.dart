@@ -75,15 +75,6 @@ class _HobbiesScreenState extends State<HobbiesScreen> {
     return Scaffold(
       body: Column(
         children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16.0),
-            child: const Text(
-              'Lista de Hobbies',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-          ),
           Expanded(
             child: _isLoading
                 ? const Center(
@@ -97,7 +88,7 @@ class _HobbiesScreenState extends State<HobbiesScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                Icons.self_improvement, // Puedes cambiarlo por otro si prefieres
+                                Icons.self_improvement,
                                 size: MediaQuery.of(context).size.width * 0.25,
                                 color: Colors.grey,
                               ),
@@ -124,74 +115,89 @@ class _HobbiesScreenState extends State<HobbiesScreen> {
                           ),
                         ),
                       )
-                    : ListView.builder(
-                      itemCount: _hobbies.length,
-                      itemBuilder: (context, index) {
-                        final hobby = _hobbies[index];
-                        return InkWell(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => HobbyDetailScreen(hobby: hobby),
-                              ),
-                            ).then((result) async {
-                              if (result == true) {
-                                // El hobby fue eliminado
-                                final updatedHobbies = await _storageService.getHobbies();
-                                setState(() {
-                                  _hobbies = updatedHobbies;
-                                });
-                              } else if (result != null && result is Hobby) {
-                                // El hobby fue editado
-                                setState(() {
-                                  _hobbies[index] = result;
-                                });
-                                _storageService.updateHobby(result);
-                              }
-                            });
-                          },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              border: Border(
-                                bottom: BorderSide(
-                                  color: Colors.grey.withOpacity(0.3),
-                                  width: 1.0,
-                                ),
-                              ),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 12.0,
-                                horizontal: 16.0,
-                              ),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    hobby.icon,
-                                    style: const TextStyle(fontSize: 24),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Text(
-                                      hobby.name,
-                                      style: const TextStyle(fontSize: 16),
-                                    ),
-                                  ),
-                                  Text(
-                                    hobby.time,
-                                    style: const TextStyle(fontSize: 14),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Icon(Icons.alarm, size: 20),
-                                  const Icon(Icons.chevron_right, size: 40)
-                                ],
-                              ),
+                    : Column(
+                        children: [
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16.0),
+                            child: const Text(
+                              'Lista de Hobbies',
+                              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                              textAlign: TextAlign.center,
                             ),
                           ),
-                        );
-                      },
-                    ),
+                          Expanded(
+                            child: ListView.builder(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              itemCount: _hobbies.length,
+                              itemBuilder: (context, index) {
+                                final hobby = _hobbies[index];
+                                return InkWell(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            HobbyDetailScreen(hobby: hobby),
+                                      ),
+                                    ).then((result) async {
+                                      if (result == true) {
+                                        final updatedHobbies = await _storageService.getHobbies();
+                                        setState(() {
+                                          _hobbies = updatedHobbies;
+                                        });
+                                      } else if (result != null && result is Hobby) {
+                                        setState(() {
+                                          _hobbies[index] = result;
+                                        });
+                                        _storageService.updateHobby(result);
+                                      }
+                                    });
+                                  },
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      border: Border(
+                                        bottom: BorderSide(
+                                          color: Colors.grey.withOpacity(0.3),
+                                          width: 1.0,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 12.0,
+                                        horizontal: 16.0,
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Text(
+                                            hobby.icon,
+                                            style: const TextStyle(fontSize: 24),
+                                          ),
+                                          const SizedBox(width: 16),
+                                          Expanded(
+                                            child: Text(
+                                              hobby.name,
+                                              style: const TextStyle(fontSize: 16),
+                                            ),
+                                          ),
+                                          Text(
+                                            hobby.time,
+                                            style: const TextStyle(fontSize: 14),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          const Icon(Icons.alarm, size: 20),
+                                          const Icon(Icons.chevron_right, size: 40)
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
           ),
         ],
       ),

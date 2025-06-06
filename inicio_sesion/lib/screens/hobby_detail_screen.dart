@@ -336,8 +336,8 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
     });
   }
 
-  void _editHobby() {
-    Navigator.push(
+  void _editHobby() async {
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => HobbyFormScreen(
@@ -353,37 +353,29 @@ class _HobbyDetailScreenState extends State<HobbyDetailScreen> {
           isEditing: true,
         ),
       ),
-    ).then((result) {
-      if (result != null && result is Map<String, dynamic>) {
-        // Actualizar el hobby con los nuevos datos
-        setState(() {
-          _weeklyGoal = result['weeklyGoal'] ?? _weeklyGoal;
-          
-          // Verificar si se cumplió la meta con el nuevo objetivo
-          _checkGoalCompletion();
-          
-          // Actualizar el hobby y guardarlo
-          final updatedHobby = Hobby(
-            id: widget.hobby.id,
-            name: result['name'] ?? widget.hobby.name,
-            icon: result['icon'] ?? widget.hobby.icon,
-            time: _totalTime,
-            weeklyGoal: _weeklyGoal,
-            registeredTimes: _registeredTimes,
-            activeDays: _activeDays,
-          );
-          
-          _storageService.updateHobby(updatedHobby);
-          
-          // Actualizar la referencia al hobby
-          widget.hobby.time = _totalTime;
-        });
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Hobby actualizado')),
-        );
-      }
-    });
+    );
+
+    // Verifica si volvió un objeto válido
+    if (result != null && result is Hobby) {
+      setState(() {
+        _weeklyGoal = result.weeklyGoal;
+        _registeredTimes = result.registeredTimes;
+        _activeDays = result.activeDays;
+        _totalTime = result.time;
+
+        _checkGoalCompletion();
+
+        // Guardar cambios localmente
+        _storageService.updateHobby(result);
+
+        // (opcional) actualiza el objeto que recibiste en widget
+        widget.hobby.time = result.time;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Hobby actualizado')),
+      );
+    }
   }
 
   void _deleteHobby() {
