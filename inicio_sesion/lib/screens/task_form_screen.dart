@@ -118,15 +118,33 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   }
 
   void _showTimePicker() async {
-    final pickedTime = await showTimePicker(
+    final time = await showTimePicker(
       context: context,
       initialTime: _selectedTime,
+      builder: (BuildContext context, Widget? child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            timePickerTheme: TimePickerThemeData(
+              hourMinuteTextStyle: TextStyle(fontSize: 24),
+              hourMinuteColor: Colors.grey[200],
+              dayPeriodTextStyle: TextStyle(fontSize: 12),
+              dayPeriodColor: Colors.grey[200],
+              dialHandColor: Colors.blue,
+              dialBackgroundColor: Colors.grey[200],
+              hourMinuteTextColor: Colors.black,
+              dayPeriodTextColor: Colors.black,
+            ),
+          ),
+          child: MediaQuery(
+            data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+            child: child!,
+          ),
+        );
+      },
     );
 
-    if (pickedTime != null) {
-      setState(() {
-        _selectedTime = pickedTime;
-      });
+    if (time != null) {
+      setState(() => _selectedTime = time);
     }
   }
 
@@ -603,6 +621,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                             ),
                           ),
                           const SizedBox(width: 12),
+
                           // Hora
                           Expanded(
                             child: Column(
@@ -619,13 +638,24 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                                 GestureDetector(
                                   onTap: _showTimePicker,
                                   child: Container(
-                                    padding: const EdgeInsets.all(12),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                      horizontal: 16,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: Colors.white,
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
                                         color: Colors.grey.shade300,
+                                        width: 1.5,
                                       ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.05),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
                                     ),
                                     child: Row(
                                       mainAxisAlignment:
@@ -633,9 +663,16 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                                       children: [
                                         Text(
                                           _selectedTime.format(context),
-                                          style: const TextStyle(fontSize: 16),
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            color: Colors.black87,
+                                          ),
                                         ),
-                                        const Icon(Icons.access_time, size: 20),
+                                        const Icon(
+                                          Icons.access_time,
+                                          size: 20,
+                                          color: Color(0xFF4A90E2),
+                                        ), // Azul suave
                                       ],
                                     ),
                                   ),
@@ -647,7 +684,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // 🆕 NUEVO: Switch para recordatorio
+                      //NUEVO: Switch para recordatorio
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -685,9 +722,10 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                         ),
                       ),
 
-                      // 🆕 NUEVO: Información del recordatorio
+                      // NUEVO: Información del recordatorio
                       if (_hasReminder) ...[
                         const SizedBox(height: 8),
+
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
@@ -737,7 +775,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                                           _selectedTime.minute,
                                         ),
                                       )
-                                      ? 'Se enviará notificación el ${DateFormat('dd/MM/yyyy').format(_selectedDate)} a las ${_selectedTime.format(context)}'
+                                      ? 'Se enviará notificación el ${DateFormat('dd/MM/yyyy').format(_selectedDate)} a las ${TimeOfDay.fromDateTime(DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, _selectedTime.hour, _selectedTime.minute).subtract(const Duration(minutes: 5))).format(context)}'
                                       : '⚠️ Fecha en el pasado - No se programará notificación',
                                   style: TextStyle(
                                     fontSize: 14,

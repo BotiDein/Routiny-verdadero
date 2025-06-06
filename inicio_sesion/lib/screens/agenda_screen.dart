@@ -750,7 +750,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
                               ),
                             ),
                           ),
-                          // 🆕 NUEVO: Indicador de recordatorio
+                          // NUEVO: Indicador de recordatorio
                           if (hasReminder) ...[
                             const SizedBox(width: 8),
                             Icon(
@@ -816,7 +816,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
                               ),
                             ),
                           ),
-                          // 🆕 NUEVO: Badge de recordatorio
+                          // NUEVO: Badge de recordatorio
                           if (hasReminder) ...[
                             const SizedBox(width: 8),
                             Container(
