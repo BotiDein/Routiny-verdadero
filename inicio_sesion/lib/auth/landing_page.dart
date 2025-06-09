@@ -14,7 +14,7 @@ class LandingPage extends StatelessWidget {
           (BuildContext dialogContext) => AlertDialog(
             title: const Text('Advertencia'),
             content: const Text(
-              'Si se borra la app, los datos no quedarán guardados.¿Seguro que quieres seguir?',
+              'Si se borra la app, los datos no quedarán guardados. ¿Seguro que quieres seguir?',
             ),
             actions: [
               TextButton(
@@ -48,86 +48,111 @@ class LandingPage extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: Colors.cyan[50],
-      body: Center(
-        child: Padding(
-          padding: EdgeInsets.all(screenWidth * 0.06),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.person, size: screenWidth * 0.3, color: Colors.blue),
-              SizedBox(height: screenHeight * 0.04),
-
-              // Botón Invitado
-              SizedBox(
-                width: buttonWidth,
-                height: buttonHeight,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4A90E2),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(screenWidth * 0.02),
-                    ),
+      body: SingleChildScrollView(
+        child: SizedBox(
+          height: screenHeight,
+          child: Center(
+            child: Padding(
+              padding: EdgeInsets.all(screenWidth * 0.06),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.person,
+                    size: screenWidth * 0.3,
+                    color: Colors.blue,
                   ),
-                  onPressed: () => _showGuestDialog(context),
-                  child: Center(
-                    child: Text(
-                      '¿Quieres iniciar sesión como invitado?',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: fontSize),
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(height: screenHeight * 0.02),
+                  SizedBox(height: screenHeight * 0.04),
 
-              Text('o', style: TextStyle(fontSize: fontSize)),
-              SizedBox(height: screenHeight * 0.02),
-
-              // Botón Correo
-              SizedBox(
-                width: buttonWidth,
-                height: buttonHeight,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4A90E2),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(screenWidth * 0.02),
-                    ),
-                  ),
-                  onPressed:
-                      () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const LoginPage()),
+                  // Botón Invitado
+                  SizedBox(
+                    width: buttonWidth,
+                    height: buttonHeight,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4A90E2),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            screenWidth * 0.02,
+                          ),
+                        ),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: screenWidth * 0.02,
+                        ),
                       ),
-                  child: Center(
-                    child: Text(
-                      '¿Quieres iniciar sesión con un correo?',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: fontSize),
+                      onPressed: () => _showGuestDialog(context),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '¿Quieres iniciar sesión como invitado?',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: fontSize),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              SizedBox(height: screenHeight * 0.04),
+                  SizedBox(height: screenHeight * 0.02),
 
-              TextButton(
-                onPressed:
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const RegisterPage()),
+                  Text('o', style: TextStyle(fontSize: fontSize)),
+                  SizedBox(height: screenHeight * 0.02),
+
+                  // Botón Correo
+                  SizedBox(
+                    width: buttonWidth,
+                    height: buttonHeight,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4A90E2),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            screenWidth * 0.02,
+                          ),
+                        ),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: screenWidth * 0.02,
+                        ),
+                      ),
+                      onPressed:
+                          () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const LoginPage(),
+                            ),
+                          ),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '¿Quieres iniciar sesión con un correo?',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: fontSize),
+                        ),
+                      ),
                     ),
-                child: Text(
-                  '¿No te has registrado aun?\nDa clic aquí',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: fontSize,
-                    color: const Color(0xFF0052A9),
                   ),
-                ),
+                  SizedBox(height: screenHeight * 0.04),
+
+                  TextButton(
+                    onPressed:
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const RegisterPage(),
+                          ),
+                        ),
+                    child: Text(
+                      '¿No te has registrado aun?\nDa clic aquí',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: fontSize,
+                        color: const Color(0xFF0052A9),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
