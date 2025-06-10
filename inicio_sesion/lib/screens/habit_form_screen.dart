@@ -27,10 +27,6 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
   int _minutes = 0;
   int _seconds = 0;
 
-  int _regHours = 0;
-  int _regMinutes = 0;
-  int _regSeconds = 0;
-
   final List<String> _categories = [
     'Ejercicio', 'Salud', 'Educación', 'Trabajo', 
     'Personal', 'Finanzas', 'Hobbies', 'Otros',
@@ -73,19 +69,6 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
         }
       }
     }
-
-    final today = DateTime.now().weekday % 7;
-    if (widget.habit!.registeredTimes!.containsKey(today.toString())) {
-      final regTime = widget.habit!.registeredTimes![today.toString()];
-      if (regTime != null) {
-        final timeParts = regTime.split(':');
-        if (timeParts.length == 3) {
-          _regHours = int.tryParse(timeParts[0]) ?? 0;
-          _regMinutes = int.tryParse(timeParts[1]) ?? 0;
-          _regSeconds = int.tryParse(timeParts[2]) ?? 0;
-        }
-      }
-    }
   }
 
   @override
@@ -97,100 +80,145 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
     super.dispose();
   }
 
-  void _showTimePickerDialog() {
+  void _showTimePickerDialog() async {
     int hours = _hours;
     int minutes = _minutes;
     int seconds = _seconds;
 
-    final isSmallScreen = MediaQuery.of(context).size.width < 360;
-    final timeSelectorSize = isSmallScreen ? MediaQuery.of(context).size.width * 0.18 : 80.0;
-    final fontSize = isSmallScreen ? 16.0 : 24.0;
-    final labelFontSize = isSmallScreen ? 12.0 : 14.0;
+    final isSmallScreen = MediaQuery.of(context).size.width < 370;
+    final isVerySmallScreen = MediaQuery.of(context).size.width < 300;
+    final timeSelectorSize = isVerySmallScreen
+        ? MediaQuery.of(context).size.width * 0.22
+        : isSmallScreen
+            ? MediaQuery.of(context).size.width * 0.18
+            : 80.0;
+    final fontSize = isVerySmallScreen ? 14.0 : isSmallScreen ? 16.0 : 24.0;
+    final labelFontSize = isVerySmallScreen ? 10.0 : isSmallScreen ? 12.0 : 14.0;
 
-    showDialog(
+    final result = await showDialog<Map<String, int>>(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(
-            'Seleccionar Tiempo',
-            style: TextStyle(fontSize: isSmallScreen ? 16 : 18),
-          ),
-          content: StatefulBuilder(
-            builder: (BuildContext context, StateSetter setState) {
-              return SizedBox(
-                height: isSmallScreen ? 150 : 180,
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: EdgeInsets.all(isVerySmallScreen ? 12 : 16),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Selecciona el tiempo objetivo:',
-                      style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
+                      'Seleccionar Tiempo',
+                      style: TextStyle(
+                        fontSize: isVerySmallScreen ? 16 : isSmallScreen ? 18 : 20,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: isVerySmallScreen ? 8 : 12),
+                    Text(
+                      'Selecciona el tiempo objetivo:',
+                      style: TextStyle(
+                        fontSize: isVerySmallScreen ? 12 : isSmallScreen ? 14 : 16,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: isVerySmallScreen ? 12 : 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         _buildTimeSelector(
-                          'Horas', 
-                          hours, 
-                          (val) => hours = val, 
-                          timeSelectorSize, 
-                          fontSize, 
+                          'Horas',
+                          hours,
+                          (val) {
+                            setState(() {
+                              hours = val;
+                            });
+                          },
+                          timeSelectorSize,
+                          fontSize,
                           labelFontSize,
-                          max: 23
+                          max: 23,
                         ),
-                        SizedBox(width: isSmallScreen ? 8 : 16),
+                        SizedBox(width: isVerySmallScreen ? 4 : 8),
                         _buildTimeSelector(
-                          'Minutos', 
-                          minutes, 
-                          (val) => minutes = val, 
-                          timeSelectorSize, 
-                          fontSize, 
+                          'Minutos',
+                          minutes,
+                          (val) {
+                            setState(() {
+                              minutes = val;
+                            });
+                          },
+                          timeSelectorSize,
+                          fontSize,
                           labelFontSize,
-                          max: 59
+                          max: 59,
                         ),
-                        SizedBox(width: isSmallScreen ? 8 : 16),
+                        SizedBox(width: isVerySmallScreen ? 4 : 8),
                         _buildTimeSelector(
-                          'Segundos', 
-                          seconds, 
-                          (val) => seconds = val, 
-                          timeSelectorSize, 
-                          fontSize, 
+                          'Segundos',
+                          seconds,
+                          (val) {
+                            setState(() {
+                              seconds = val;
+                            });
+                          },
+                          timeSelectorSize,
+                          fontSize,
                           labelFontSize,
-                          max: 59
+                          max: 59,
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: isVerySmallScreen ? 16 : 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: Text(
+                            'Cancelar',
+                            style: TextStyle(
+                              fontSize: isVerySmallScreen ? 12 : 14,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop({
+                              'hours': hours,
+                              'minutes': minutes,
+                              'seconds': seconds,
+                            });
+                          },
+                          child: Text(
+                            'Aceptar',
+                            style: TextStyle(
+                              fontSize: isVerySmallScreen ? 12 : 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ],
                     ),
                   ],
                 ),
-              );
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(
-                'Cancelar',
-                style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
               ),
-            ),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _hours = hours;
-                  _minutes = minutes;
-                  _seconds = seconds;
-                });
-                Navigator.of(context).pop();
-              },
-              child: Text(
-                'Aceptar',
-                style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
-              ),
-            ),
-          ],
+            );
+          },
         );
       },
     );
+
+    if (result != null) {
+      setState(() {
+        _hours = result['hours']!;
+        _minutes = result['minutes']!;
+        _seconds = result['seconds']!;
+      });
+    }
   }
 
   Widget _buildTimeSelector(
@@ -203,134 +231,66 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
     {int max = 59, int min = 0}
   ) {
     final isSmallScreen = MediaQuery.of(context).size.width < 360;
+    final isVerySmallScreen = MediaQuery.of(context).size.width < 300;
     
     return SizedBox(
       width: width,
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             label,
-            style: TextStyle(fontSize: labelFontSize),
+            style: TextStyle(
+              fontSize: labelFontSize,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           IconButton(
-            icon: Icon(Icons.arrow_drop_up, size: isSmallScreen ? 24 : 30),
-            onPressed: () => onChanged(value < max ? value + 1 : value),
+            icon: Icon(
+              Icons.arrow_drop_up, 
+              size: isVerySmallScreen ? 20 : isSmallScreen ? 24 : 30,
+              color: Colors.blue,
+            ),
+            padding: EdgeInsets.zero,
+            constraints: BoxConstraints(),
+            onPressed: () {
+              onChanged(value < max ? value + 1 : value);
+            },
           ),
-          Text(
-            value.toString().padLeft(2, '0'),
-            style: TextStyle(fontSize: fontSize),
+          Container(
+            height: isVerySmallScreen ? 28 : isSmallScreen ? 32 : 36,
+            alignment: Alignment.center,
+            child: Text(
+              value.toString().padLeft(2, '0'),
+              style: TextStyle(
+                fontSize: fontSize,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
           ),
           IconButton(
-            icon: Icon(Icons.arrow_drop_down, size: isSmallScreen ? 24 : 30),
-            onPressed: () => onChanged(value > min ? value - 1 : value),
+            icon: Icon(
+              Icons.arrow_drop_down, 
+              size: isVerySmallScreen ? 20 : isSmallScreen ? 24 : 30,
+              color: Colors.blue,
+            ),
+            padding: EdgeInsets.zero,
+            constraints: BoxConstraints(),
+            onPressed: () {
+              onChanged(value > min ? value - 1 : value);
+            },
           ),
         ],
       ),
     );
   }
 
-  void _showRegisteredTimePickerDialog() {
-    int hours = _regHours;
-    int minutes = _regMinutes;
-    int seconds = _regSeconds;
-
-    final isSmallScreen = MediaQuery.of(context).size.width < 360;
-    final timeSelectorSize = isSmallScreen ? MediaQuery.of(context).size.width * 0.18 : 80.0;
-    final fontSize = isSmallScreen ? 16.0 : 24.0;
-    final labelFontSize = isSmallScreen ? 12.0 : 14.0;
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(
-            'Registrar Tiempo',
-            style: TextStyle(fontSize: isSmallScreen ? 16 : 18),
-          ),
-          content: StatefulBuilder(
-            builder: (BuildContext context, StateSetter setState) {
-              return SizedBox(
-                height: isSmallScreen ? 150 : 180,
-                child: Column(
-                  children: [
-                    Text(
-                      '¿Cuánto tiempo dedicaste hoy?',
-                      style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildTimeSelector(
-                          'Horas', 
-                          hours, 
-                          (val) => hours = val, 
-                          timeSelectorSize, 
-                          fontSize, 
-                          labelFontSize,
-                          max: 23
-                        ),
-                        SizedBox(width: isSmallScreen ? 8 : 16),
-                        _buildTimeSelector(
-                          'Minutos', 
-                          minutes, 
-                          (val) => minutes = val, 
-                          timeSelectorSize, 
-                          fontSize, 
-                          labelFontSize,
-                          max: 59
-                        ),
-                        SizedBox(width: isSmallScreen ? 8 : 16),
-                        _buildTimeSelector(
-                          'Segundos', 
-                          seconds, 
-                          (val) => seconds = val, 
-                          timeSelectorSize, 
-                          fontSize, 
-                          labelFontSize,
-                          max: 59
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(
-                'Cancelar',
-                style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _regHours = hours;
-                  _regMinutes = minutes;
-                  _regSeconds = seconds;
-                });
-                Navigator.of(context).pop();
-              },
-              child: Text(
-                'Guardar',
-                style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   String get _formattedTime {
     return '${_hours.toString().padLeft(2, '0')}:${_minutes.toString().padLeft(2, '0')}:${_seconds.toString().padLeft(2, '0')}';
-  }
-
-  String get _formattedRegisteredTime {
-    return '${_regHours.toString().padLeft(2, '0')}:${_regMinutes.toString().padLeft(2, '0')}:${_regSeconds.toString().padLeft(2, '0')}';
   }
 
   void _showCategoryDialog() {
@@ -409,8 +369,6 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
                       
                       if (_selectedType == 'time') ...[
                         _buildTimeOptions(titleFontSize, inputFontSize, isSmallScreen),
-                        const SizedBox(height: 16),
-                        _buildRegisteredTimeSection(titleFontSize, inputFontSize, isSmallScreen),
                         const SizedBox(height: 16),
                       ],
                       
@@ -582,48 +540,6 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
     );
   }
 
-  Widget _buildRegisteredTimeSection(double titleFontSize, double inputFontSize, bool isSmallScreen) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('Tiempo registrado hoy', titleFontSize),
-        const SizedBox(height: 8),
-        GestureDetector(
-          onTap: _showRegisteredTimePickerDialog,
-          child: Container(
-            width: double.infinity,
-            padding: EdgeInsets.symmetric(
-              horizontal: isSmallScreen ? 8 : 12,
-              vertical: isSmallScreen ? 10 : 14,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  _formattedRegisteredTime,
-                  style: TextStyle(
-                    fontSize: inputFontSize,
-                    color: Colors.black,
-                  ),
-                ),
-                Icon(
-                  Icons.timer,
-                  color: const Color(0xFF4A90E2),
-                  size: isSmallScreen ? 20 : 24,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildDescriptionInput(double fontSize, bool isSmallScreen) {
     return TextField(
       controller: _descriptionController,
@@ -718,10 +634,8 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
       days: widget.isEditing ? widget.habit!.days : [0, 0, 0, 0, 0, 0, 0],
       createdAt: widget.isEditing ? widget.habit!.createdAt : DateTime.now(),
       completedDates: widget.isEditing ? widget.habit!.completedDates : {},
-      registeredTimes: _selectedType == 'time'
-          ? (widget.isEditing && widget.habit?.registeredTimes != null
-              ? Map<String, String>.from(widget.habit!.registeredTimes)
-              : {})..[DateTime.now().weekday % 7.toString()] = _formattedRegisteredTime
+      registeredTimes: widget.isEditing && widget.habit?.registeredTimes != null
+          ? Map<String, String>.from(widget.habit!.registeredTimes!)
           : null,
     );
 
